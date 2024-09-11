@@ -35,33 +35,23 @@ workflow PREPROCESSING {
 
 
     // Prep specified database or use `metaphlan --install --bowtie2db metaphlan_db_latest`
-    if ( params.db ) {
+    if ( params.metaphlan_db ) {
+        Channel
+            .fromPath( "${params.metaphlan_db}*" )
+            .ifEmpty { error "No database files found at ${params.metaphlan_db}*" }
+            .toSortedList()
+            .set { db_ch }
 
-        process DB_CHECK (
-            // Make a channel with the reference database files
-            Channel
-                .fromPath( "${params.db}*" )
-                .ifEmpty { error "No database files found at ${params.db}*" }
-                .toSortedList()
-                .set { db_ch }
-
-            UNTAR ( db_ch )
+        UNTAR ( db_ch )
             .set { ch_final_dbs }
-            ch_versions = ch_versions.mix(UNTAR.out.versions.first())
-        )
-    } else {
+        ch_versions = ch_versions.mix(UNTAR.out.versions.first())
+    } else if ( params.installdb ) {
         METAPHLAN_MAKEDB ()
     }
 
+
     process INPUT_CHECK (
         
-        // Make a channel with reference database files
-        Channel
-            .fromPath( "${params.db}*" )
-            .ifEmpty { error "No database files found at ${params.db}*" }
-            .toSortedList()
-            .set {db_ch}
-
         // If the samplesheet exists, convert to tuple/ list by...
         if ( params.samplesheet ){
             // ...creating a channel from the samplesheet, parse it, and branch into single- and paired-end samples
@@ -105,7 +95,8 @@ workflow PREPROCESSING {
 
     contaminants = params.shortread_qc_contaminantslist ? file(params.shortread_qc_contaminantslist) : []
     if ( params.shortread_qc_contaminantslist ) {
-        if ( params.qc_tool == 'bbduk' && !contaminants.extension.matches(".*(csv|tsv|txt)") ) error "[metaphlanstrainphlanPipeline] ERROR: Contaminants or adapter list requires a different format and extension. Check input: --shortread_qc_contaminantslist ${params.shortread_qc_contaminantslist}"
+        if ( params.qc_tool == 'bbduk' && !contaminants.extension.matches(".*(csv|tsv|txt)") ) {
+            error "[metaphlanstrainphlanPipeline] ERROR: Contaminants or adapter list requires a different format and extension. Check input: --shortread_qc_contaminantslist ${params.shortread_qc_contaminantslist}"
     }
 
     // Carry out pre-processing of paired-reads w tools ie bbduk, fastqc 

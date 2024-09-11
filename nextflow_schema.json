@@ -292,5 +292,145 @@
         {
             "$ref": "#/definitions/generic_options"
         }
-    ]
+    ],
+    "properties": {
+        "samplesheet": {
+            "type": "string",
+            "description": "Path to comma-separated file containing information about the samples in the experiment.",
+            "format": "file-path"
+        },
+        "input_folder": {
+            "type": "string",
+            "description": "Path to directory containing fastq reads",
+            "format": "directory-path"
+        },
+        "file_suffix": {
+            "type": "string",
+            "default": ".fastq.gz",
+            "description": "Suffix of input reads"
+        },
+        "file_spacer": {
+            "type": "string",
+            "default": "_",
+            "description": "Spacer of input reads"
+        },
+        "cpus": {
+            "type": "integer",
+            "default": 16
+        },
+        "memory_gb": {
+            "type": "integer",
+            "default": 20
+        },
+        "skip_preprocessing_qc": {
+            "type": "boolean",
+            "description": "Skips preprocessing steps and starts profiling"
+        },
+        "perform_shortread_qc": {
+            "type": "boolean",
+            "default": true,
+            "description": "Performs preprocessing quality control steps on short reads"
+        },
+        "shortread_qc_contaminantslist": {
+            "type": "string",
+            "description": "List can contain adapters, contaminants etc."
+        },
+        "qc_tool": {
+            "type": "string",
+            "description": "Select QC tool and/or assessment to use for preprocessing",
+            "enum": ["fastqc", "bbmerge", "fastp"]
+        },
+        "bbmerge_pairs": {
+            "type": "boolean",
+            "description": "Option to merge R1 and R2 short reads using bbmerge",
+            "default": false
+        },
+        "run_metaphlan": {
+            "type": "boolean",
+            "default": true,
+            "description": "Runs MetaPhlan4.0"
+        },
+        "metaphlan_db": {
+            "type": "string",
+            "description": "Directory containing MetaPhlan database",
+            "help_text": "Directory containing metaphlan database is specified here, if parameter is not selected, the latest database will be installed",
+            "default": "./db/",
+            "format": "directory-path"
+        },
+        "s": {
+            "type": "boolean",
+            "default": true,
+            "description": "--samout flag for MetaPhlan to output .sam files alongside profiles"
+        },
+        "min_alignment_len": {
+            "type": "string",
+            "description": "MetaPhlan params"
+        },
+        "min_mapq_val": {
+            "type": "integer",
+            "default": 5,
+            "description": "MetaPhlan params"
+        },
+        "tax_lev": {
+            "type": "string",
+            "default": "a",
+            "description": "MetaPhlan params"
+        },
+        "min_cu_len": {
+            "type": "integer",
+            "default": 2000,
+            "description": "MetaPhlan params"
+        },
+        "add_viruses": {
+            "type": "boolean",
+            "description": "MetaPhlan params"
+        },
+        "ignore_eukaryotes": {
+            "type": "boolean",
+            "description": "MetaPhlan params"
+        },
+        "ignore_archaea": {
+            "type": "boolean",
+            "description": "MetaPhlan params"
+        },
+        "ignore_bacteria": {
+            "type": "boolean",
+            "description": "MetaPhlan params"
+        },
+        "unclassified_estimation": {
+            "type": "boolean",
+            "default": true,
+            "description": "MetaPhlan params"
+        },
+        "run_strainphlan": {
+            "type": "boolean",
+            "description": "Run StrainPhlan",
+            "default": true
+        },
+        "clades": {
+            "type": "string",
+            "description": "StrainPhlan flag to add name of clade of interest"
+        },
+        "mutation_rates": {
+            "type": "boolean",
+            "default": true,
+            "description": "StrainPhlan params"
+        },
+        "strainphlan_db": {
+            "type": "boolean",
+            "default": true,
+            "description": ".pkl database file as input for StrainPhlan",
+            "help_text": ".pkl file containing MetaPhlan's database as input for StrainPhlan"
+        },
+        "clade_markers": {
+            "type": "string",
+            "default": "./clade_markers/",
+            "description": "StrainPhlan params to use specified clade's .fna assembly"
+        },
+        "metadata": {
+            "type": "boolean",
+            "description": "Metadata .txt file for add_metadata_tree.py"
+        }
+    },
+    "required": ["qc_tool", "run_metaphlan", "run_strainphlan", "metadata"]
 }

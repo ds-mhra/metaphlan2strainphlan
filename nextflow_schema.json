@@ -2,7 +2,7 @@
     "$schema": "http://json-schema.org/draft-07/schema",
     "$id": "https://raw.githubusercontent.com/nf-core/metaphlanstrainphlan/master/nextflow_schema.json",
     "title": "nf-core/metaphlanstrainphlan pipeline parameters",
-    "description": "Pipeline carries out taxonomy analysis on metagenomic sequencing by pre-processing reads and using metaphlan and strainphlan.",
+    "description": "Pipeline carries out taxonomy analysis on metagenomic sequencing by pre-processing reads and using metaphlan and strainphlan.\n",
     "type": "object",
     "definitions": {
         "input_output_options": {
@@ -297,7 +297,8 @@
         "samplesheet": {
             "type": "string",
             "description": "Path to comma-separated file containing information about the samples in the experiment.",
-            "format": "file-path"
+            "format": "file-path",
+            "default": "samplsheet.csv"
         },
         "input_folder": {
             "type": "string",
@@ -338,12 +339,12 @@
         "qc_tool": {
             "type": "string",
             "description": "Select QC tool and/or assessment to use for preprocessing",
-            "enum": ["fastqc", "bbmerge", "fastp"]
+            "enum": ["fastqc", "bbmerge", "fastp"],
+            "default": "fastqc"
         },
         "bbmerge_pairs": {
             "type": "boolean",
-            "description": "Option to merge R1 and R2 short reads using bbmerge",
-            "default": false
+            "description": "Option to merge R1 and R2 short reads using bbmerge"
         },
         "run_metaphlan": {
             "type": "boolean",
@@ -432,5 +433,5 @@
             "description": "Metadata .txt file for add_metadata_tree.py"
         }
     },
-    "required": ["qc_tool", "run_metaphlan", "run_strainphlan", "metadata"]
+    "required": ["qc_tool", "run_metaphlan", "run_strainphlan"]
 }

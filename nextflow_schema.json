@@ -2,8 +2,7 @@
     "$schema": "http://json-schema.org/draft-07/schema",
     "$id": "https://raw.githubusercontent.com/nf-core/metaphlanstrainphlan/master/nextflow_schema.json",
     "title": "nf-core/metaphlanstrainphlan pipeline parameters",
-    "description": "Pipeline carries out taxonomy analysis on metagenomic sequencing by pre-processing reads and using metaphlan and strainphlan.
-",
+    "description": "Pipeline carries out taxonomy analysis on metagenomic sequencing by pre-processing reads and using metaphlan and strainphlan.",
     "type": "object",
     "definitions": {
         "input_output_options": {

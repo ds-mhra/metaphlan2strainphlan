@@ -10,31 +10,47 @@ include { paramsSummaryMap       } from 'plugin/nf-validation'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_metaphlanstrainphlan_pipeline'
+include { METAPHLAN_MAKEDB       } from '../modules/nf-core/metaphlan/makedb/main'                                        
+include { METAPHLAN_METAPHLAN    } from '../modules/nf-core/metaphlan/metaphlan/main'                                                            
+include { METAPHLAN_MERGEMETAPHLANTABLES } from '../modules/nf-core/metaphlan/mergemetaphlantables/main'
+
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    RUN MAIN WORKFLOW
+    RUN WORKFLOW: PROFILING
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-workflow METAPHLANSTRAINPHLAN {
+
+    
+workflow PROFILING {
 
     take:
-    ch_samplesheet // channel: samplesheet read in from --input
+    ch_samplesheet
 
     main:
 
     ch_versions = Channel.empty()
     ch_multiqc_files = Channel.empty()
 
-    //
-    // MODULE: Run FastQC
-    //
-    FASTQC (
-        ch_samplesheet
-    )
-    ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]})
-    ch_versions = ch_versions.mix(FASTQC.out.versions.first())
+    // Run paired-end alignment using metaphlan 
+    if ( params.run_metaphlan ) {
+        ch_raw_profiles         = Channel.empty()  // These are count tables
+        
+        // Run metaphlan
+        METAPHLAN_METAPHLAN ( 
+            final_input_reads, ch_final_dbs
+        )
+        ch_versions        = ch_versions.mix( METAPHLAN_METAPHLAN.out.versions.first() )
+        ch_raw_profiles    = ch_raw_profiles.mix( METAPHLAN_METAPHLAN.out.profile )
+
+        // Merge all metaphlan profiles
+        METAPHLAN_MERGEMETAPHLANTABLES ( 
+            ch_raw_profiles
+        )
+    }
+}
+
 
     //
     // Collate and save software versions

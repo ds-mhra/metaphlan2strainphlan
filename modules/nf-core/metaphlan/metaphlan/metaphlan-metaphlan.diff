@@ -1,0 +1,21 @@
+Changes in module 'nf-core/metaphlan/metaphlan'
+--- modules/nf-core/metaphlan/metaphlan/main.nf
++++ modules/nf-core/metaphlan/metaphlan/main.nf
+@@ -15,6 +15,7 @@
+     tuple val(meta), path("*_profile.txt")   ,                emit: profile
+     tuple val(meta), path("*.biom")          ,                emit: biom
+     tuple val(meta), path('*.bowtie2out.txt'), optional:true, emit: bt2out
++    tuple val(meta), path("*.sam.bz2")       ,                emit: sam
+     path "versions.yml"                      ,                emit: versions
+ 
+     when:
+@@ -37,6 +38,7 @@
+         $input_data \\
+         $args \\
+         $bowtie2_out \\
++        -s ${prefix}.sam.bz2 \\
+         --bowtie2db \$BT2_DB \\
+         --index \$BT2_DB_INDEX \\
+         --biom ${prefix}.biom \\
+
+************************************************************

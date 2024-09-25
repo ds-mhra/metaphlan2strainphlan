@@ -13,44 +13,106 @@ include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_meta
 include { METAPHLAN_MAKEDB       } from '../modules/nf-core/metaphlan/makedb/main'                                        
 include { METAPHLAN_METAPHLAN    } from '../modules/nf-core/metaphlan/metaphlan/main'                                                            
 include { METAPHLAN_MERGEMETAPHLANTABLES } from '../modules/nf-core/metaphlan/mergemetaphlantables/main'
+include { STRAINPHLAN_PREP        } from '../subworkflows/local/strain_characterisation'
+include { STRAINPHLAN_STRAINPHLAN } from '../subworkflows/local/strain_characterisation'
+
 
 
 /*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    RUN WORKFLOW: PROFILING
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    WORKFLOW: PROFILING & STRAIN_CHARACTERISATION
 */
 
+ch_versions         = Channel.empty()  // Initialise globally
+ch_multiqc_files    = Channel.empty()
 
-    
+// Define workflow to prep and run MetaPhlAn   
 workflow PROFILING {
 
     take:
-    ch_samplesheet
+    final_input_reads 
 
     main:
 
-    ch_versions = Channel.empty()
-    ch_multiqc_files = Channel.empty()
+    // Prep specified database or use `metaphlan --install --bowtie2db metaphlan_db_latest`
+    if ( params.metaphlan_db ) {
+        Channel
+            .fromPath( "${params.metaphlan_db}*" )
+            .ifEmpty { error "No database files found at ${params.metaphlan_db}*" }
+            .toSortedList()
+            .set { db_ch }
 
-    // Run paired-end alignment using metaphlan 
+        UNTAR( db_ch )
+        ch_versions = ch_versions.mix(UNTAR.out.versions.first())
+        ch_final_dbs = UNTAR.out.untar
+
+    } else if ( params.installdb ) {
+        ch_final_dbs = METAPHLAN_MAKEDB().out.db
+    }
+
+    // Run alignment using MetaPhlAn 
     if ( params.run_metaphlan ) {
-        ch_raw_profiles         = Channel.empty()  // These are count tables
-        
-        // Run metaphlan
+        ch_raw_profiles         = Channel.empty()       // Count table/ taxonomy profiles
+    
+        // Run MetaPhlAn
         METAPHLAN_METAPHLAN ( 
             final_input_reads, ch_final_dbs
         )
         ch_versions        = ch_versions.mix( METAPHLAN_METAPHLAN.out.versions.first() )
-        ch_raw_profiles    = ch_raw_profiles.mix( METAPHLAN_METAPHLAN.out.profile )
+        ch_raw_profiles    = ch_raw_profiles.mix( METAPHLAN_METAPHLAN.out.profile )         // Mix profiles for each sample into a single channel
 
-        // Merge all metaphlan profiles
+        // Merge all MetaPhlAn profiles
         METAPHLAN_MERGEMETAPHLANTABLES ( 
             ch_raw_profiles
         )
+        .set { ch_profiles }
+        ch_versions        = ch_versions.mix( METAPHLAN_MERGEMETAPHLANTABLES.out.versions.first() )
     }
+
+    emit:
+    sam = METAPHLAN_METAPHLAN.out.sam
+    ch_raw_profiles
+    ch_final_dbs
+    versions = ch_versions
+
 }
 
+// Define workflow to prep and/or run StrainPhlAn for strain characterisation
+workflow STRAIN_CHARACTERISATION {
+
+    take:
+    sam 
+    ch_final_dbs
+
+    main:
+
+    strainphlan_db = ch_final_dbs    // mapped and aliased ch_final_dbs to strainphlan_db
+
+    if ( params.run_strainphlan && !params.skip_strainphlan_prep ) {
+        STRAINPHLAN_PREP ( 
+            sam,
+//            METAPHLAN_METAPHLAN.out.sam,
+            ch_final_dbs, []
+//            clade
+        )
+
+        STRAINPHLAN_STRAINPHLAN (
+            STRAINPHLAN_PREP.out,
+            ch_final_dbs, []
+//            clade
+        )
+
+    } else if ( params.skip_strainphlan_prep ) {
+        Channel
+            .fromPath("${params.outdir}/strainphlan/consensus_markers/*.pkl")
+            .ifEmpty { error "No consensus marker files found at ${params.outdir}/strainphlan/consensus_markers/" }
+            .set { ch_consensus_markers }
+
+        STRAINPHLAN_STRAINPHLAN (
+            ch_consensus_markers,
+            ch_final_dbs,
+            clade
+        )
+    }
 
     //
     // Collate and save software versions
@@ -105,6 +167,7 @@ workflow PROFILING {
     emit:
     multiqc_report = MULTIQC.out.report.toList() // channel: /path/to/multiqc_report.html
     versions       = ch_versions                 // channel: [ path(versions.yml) ]
+
 }
 
 /*

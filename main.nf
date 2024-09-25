@@ -1,11 +1,9 @@
 #!/usr/bin/env nextflow
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    nf-core/metaphlanstrainphlan
+    MHRA/metaphlan2strainphlan
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Github : https://github.com/nf-core/metaphlanstrainphlan
-    Website: https://nf-co.re/metaphlanstrainphlan
-    Slack  : https://nfcore.slack.com/channels/metaphlanstrainphlan
 ----------------------------------------------------------------------------------------
 */
 
@@ -17,22 +15,14 @@ nextflow.enable.dsl = 2
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { METAPHLANSTRAINPHLAN  } from './workflows/metaphlanstrainphlan'
+// include { PROFILING               } from './workflows/metaphlanstrainphlan'
+// include { STRAIN_CHARACTERISATION } from './workflows/metaphlanstrainphlan'
+include { PREPROCESSING                      } from './workflows/preprocessing'
+include { PROFILING; STRAIN_CHARACTERISATION } from './workflows/metaphlanstrainphlan'
 include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_metaphlanstrainphlan_pipeline'
 include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_metaphlanstrainphlan_pipeline'
-
 include { getGenomeAttribute      } from './subworkflows/local/utils_nfcore_metaphlanstrainphlan_pipeline'
 
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    GENOME PARAMETER VALUES
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
-
-// TODO nf-core: Remove this line if you don't need a FASTA file
-//   This is an example of how to use getGenomeAttribute() to fetch parameters
-//   from igenomes.config using `--genome`
-params.fasta = getGenomeAttribute('fasta')
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -41,29 +31,44 @@ params.fasta = getGenomeAttribute('fasta')
 */
 
 //
-// WORKFLOW: Run main analysis pipeline depending on type of input
-//
+// WORKFLOW: Run metaPhlAn-2-strainPhlAn pipeline
+//  
 workflow NFCORE_METAPHLANSTRAINPHLAN {
-
+        
     take:
-    samplesheet // channel: samplesheet read in from --input
+    ch_samplesheet                             // channel: reads from --input_folder or --samplesheet
 
     main:
 
-    //
-    // WORKFLOW: Run pipeline
-    //
-    METAPHLANSTRAINPHLAN (
-        samplesheet
+    // Define contaminants variable based on params using `file` for file inputs and `null` if none provided
+    contaminants = params.shortread_qc_contaminantslist ? file(params.shortread_qc_contaminantslist) : null
+
+    // Run preprocessing
+    PREPROCESSING(
+        ch_samplesheet,
     )
 
-    emit:
-    multiqc_report = METAPHLANSTRAINPHLAN.out.multiqc_report // channel: /path/to/multiqc_report.html
+    // Run profiling with MetaPhlAn
+    PROFILING (
+        PREPROCESSING.out.final_input_reads,
+    )
 
-}
+    // Run characterisation of strains via StrainPhlAn
+    STRAIN_CHARACTERISATION (
+        PROFILING.out.sam, 
+        PROFILING.out.ch_final_dbs,
+    )
+      
+    emit:
+    multiqc_report = STRAIN_CHARACTERISATION.out.multiqc_report
+
+} 
+
+
+
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    RUN MAIN WORKFLOW
+    RUN SECOND WORKFLOW
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
@@ -81,14 +86,15 @@ workflow {
         params.monochrome_logs,
         args,
         params.outdir,
-        params.input
+        params.input,
     )
 
     //
     // WORKFLOW: Run main workflow
     //
     NFCORE_METAPHLANSTRAINPHLAN (
-        PIPELINE_INITIALISATION.out.samplesheet
+        PIPELINE_INITIALISATION.out.samplesheet,
+//        PIPELINE_INITIALISATION.out.databases,
     )
 
     //

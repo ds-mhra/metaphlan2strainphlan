@@ -1,12 +1,12 @@
 <h1>
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/nf-core-metaphlan2strainphlan_logo_dark.png">
-    <img alt="nf-core/metaphlan2strainphlan" src="docs/images/nf-core-metaphlan2strainphlan_logo_light.png">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/nf-core-metaphlanstrainphlan_logo_dark.png">
+    <img alt="nf-core/metaphlan2strainphlan" src="docs/images/nf-core-metaphlanstrainphlan_logo_light.png">
   </picture>
 </h1>
 
-[![GitHub Actions CI Status](https://github.com/nf-core/metaphlan2strainphlan/actions/workflows/ci.yml/badge.svg)](https://github.com/nf-core/metaphlan2strainphlan/actions/workflows/ci.yml)
-[![GitHub Actions Linting Status](https://github.com/nf-core/metaphlan2strainphlan/actions/workflows/linting.yml/badge.svg)](https://github.com/nf-core/metaphlan2strainphlan/actions/workflows/linting.yml)[![AWS CI](https://img.shields.io/badge/CI%20tests-full%20size-FF9900?labelColor=000000&logo=Amazon%20AWS)](https://nf-co.re/metaphlan2strainphlan/results)[![Cite with Zenodo](http://img.shields.io/badge/DOI-10.5281/zenodo.XXXXXXX-1073c8?labelColor=000000)](https://doi.org/10.5281/zenodo.XXXXXXX)
+[![GitHub Actions CI Status](https://github.com/nf-core/metaphlanstrainphlan/actions/workflows/ci.yml/badge.svg)](https://github.com/nf-core/metaphlanstrainphlan/actions/workflows/ci.yml)
+[![GitHub Actions Linting Status](https://github.com/nf-core/metaphlanstrainphlan/actions/workflows/linting.yml/badge.svg)](https://github.com/nf-core/metaphlanstrainphlan/actions/workflows/linting.yml)
 [![nf-test](https://img.shields.io/badge/unit_tests-nf--test-337ab7.svg)](https://www.nf-test.com)
 
 [![Nextflow](https://img.shields.io/badge/nextflow%20DSL2-%E2%89%A523.04.0-23aa62.svg)](https://www.nextflow.io/)
@@ -15,7 +15,6 @@
 [![run with singularity](https://img.shields.io/badge/run%20with-singularity-1d355c.svg?labelColor=000000)](https://sylabs.io/docs/)
 [![Launch on Seqera Platform](https://img.shields.io/badge/Launch%20%F0%9F%9A%80-Seqera%20Platform-%234256e7)](https://cloud.seqera.io/launch?pipeline=https://github.com/nf-core/metaphlan2strainphlan)
 
-[![Get help on Slack](http://img.shields.io/badge/slack-nf--core%20%23metaphlan2strainphlan-4A154B?labelColor=000000&logo=slack)](https://nfcore.slack.com/channels/metaphlan2strainphlan)[![Follow on Twitter](http://img.shields.io/badge/twitter-%40nf__core-1DA1F2?labelColor=000000&logo=twitter)](https://twitter.com/nf_core)[![Follow on Mastodon](https://img.shields.io/badge/mastodon-nf__core-6364ff?labelColor=FFFFFF&logo=mastodon)](https://mstdn.science/@nf_core)[![Watch on YouTube](http://img.shields.io/badge/youtube-nf--core-FF0000?labelColor=000000&logo=youtube)](https://www.youtube.com/c/nf-core)
 
 ## Introduction
 
@@ -60,7 +59,7 @@ Now, you can run the pipeline using:
 <!-- TODO nf-core: update the following command to include all required parameters for a minimal example -->
 
 ```bash
-nextflow run nf-core/metaphlan2strainphlan \
+nextflow run nf-core/metaphlanstrainphlan \
    -profile <docker/singularity/.../institute> \
    --input samplesheet.csv \
    --outdir <OUTDIR>
@@ -86,11 +85,6 @@ We thank the following people for their extensive assistance in the development 
 
 <!-- TODO nf-core: If applicable, make list of people who have also contributed -->
 
-## Contributions and Support
-
-If you would like to contribute to this pipeline, please see the [contributing guidelines](.github/CONTRIBUTING.md).
-
-For further information or help, don't hesitate to get in touch on the [Slack `#metaphlan2strainphlan` channel](https://nfcore.slack.com/channels/metaphlan2strainphlan) (you can join with [this invite](https://nf-co.re/join/slack)).
 
 ## Citations
 

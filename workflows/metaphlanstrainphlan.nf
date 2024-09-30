@@ -10,6 +10,8 @@ include { paramsSummaryMap       } from 'plugin/nf-validation'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_metaphlanstrainphlan_pipeline'
+include { INSTALL_DEPENDENCIES   } from "../modules/local/installing_dependencies.nf"
+include { BLAST_MAKEBLASTDB      } from '../modules/nf-core/blast/makeblastdb/main'
 include { METAPHLAN_MAKEDB       } from '../modules/nf-core/metaphlan/makedb/main'                                        
 include { METAPHLAN_METAPHLAN    } from '../modules/nf-core/metaphlan/metaphlan/main'                                                            
 include { METAPHLAN_MERGEMETAPHLANTABLES } from '../modules/nf-core/metaphlan/mergemetaphlantables/main'
@@ -46,6 +48,7 @@ workflow PROFILING {
         ch_final_dbs = UNTAR.out.untar
 
     } else if ( params.installdb ) {
+        INSTALL_DEPENDENCIES()
         ch_final_dbs = METAPHLAN_MAKEDB().out.db
     }
 

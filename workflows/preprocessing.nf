@@ -5,7 +5,7 @@
 */
 
 include { UNTAR                  } from '../modules/nf-core/untar/main'
-include { INPUT_CHECK            } from '../subworkflows/input_check'
+//include { INPUT_CHECK            } from '../subworkflows/input_check'
 include { FASTP as FASTP_PAIRED  } from '../modules/nf-core/fastp/main'
 include { FASTP as FASTP_SINGLE  } from '../modules/nf-core/fastp/main'
 include { FASTQC as FASTQC_PRE   } from '../modules/nf-core/fastqc/main'

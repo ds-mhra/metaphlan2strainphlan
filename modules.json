@@ -20,6 +20,11 @@
                         "git_sha": "5d376010ddbcc6190cb5f9257a4bf7de2613f446",
                         "installed_by": ["modules"]
                     },
+                    "blast/makeblastdb": {
+                        "branch": "master",
+                        "git_sha": "666652151335353eef2fcd58880bcef5bc2928e1",
+                        "installed_by": ["modules"]
+                    },
                     "fastp": {
                         "branch": "master",
                         "git_sha": "06c8865e36741e05ad32ef70ab3fac127486af48",

@@ -7,6 +7,7 @@ process METAPHLAN_MAKEDB {
         'biocontainers/metaphlan:4.1.1--pyhdfd78af_0' }"
 
     input:
+    path 'install_complete.txt'
 
     output:
     path "metaphlan_db_latest"      , emit: db

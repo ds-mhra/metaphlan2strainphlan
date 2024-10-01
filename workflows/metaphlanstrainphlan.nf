@@ -49,7 +49,7 @@ workflow PROFILING {
 
     } else if ( params.installdb ) {
         INSTALL_DEPENDENCIES()
-        ch_final_dbs = METAPHLAN_MAKEDB().out.db
+        ch_final_dbs = METAPHLAN_MAKEDB(INSTALL_DEPENDENCIES.out.dependenciesinstall).db
     }
 
     // Run alignment using MetaPhlAn 

@@ -121,7 +121,7 @@ workflow PREPROCESSING {
         ch_samplesheet_paired.mix(ch_samplesheet_single) 
     )
     ch_versions = ch_versions.mix(FASTQC_PRE.out.versions.first())
-    
+    ch_multiqc_files = ch_multiqc_files.mix(FASTQC_PRE.out.zip.collect{it[1]})             
 
     // Perform QC if either perform_shortread_qc or a qc_tool is selected
     if (params.perform_shortread_qc || params.qc_tool) {
@@ -215,8 +215,13 @@ workflow PREPROCESSING {
                 ch_samplesheet_single, contaminants 
             )
         // Mix any output files
-        ch_multiqc_files = ch_multiqc_files.mix(FASTP.out.zip.collect{it[1]})
-        ch_versions = ch_versions.mix(FASTP.out.versions.first())
+        ch_multiqc_files = ch_multiqc_files
+            .mix(FASTP_PAIRED.out.zip.collect{it[1]})
+            .mix(FASTP_SINGLE.out.zip.collect{it[1]})
+        
+        ch_versions = ch_versions
+            .mix(FASTP_PAIRED.out.versions.first())
+            .mix(FASTP_SINGLE.out.versions.first())
         
         final_input_reads = ch_fastp_pe.reads.mix(ch_fastp_se.reads)
         }

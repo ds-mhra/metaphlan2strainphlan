@@ -1,13 +1,13 @@
 process METAPHLAN_MAKEDB {
     label 'process_medium'
 
-    conda "${moduleDir}/environment.yml"
+    conda "./metaphlan_env.yml"     // amended to custom .yml file
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/metaphlan:4.1.1--pyhdfd78af_0' :
         'biocontainers/metaphlan:4.1.1--pyhdfd78af_0' }"
 
     input:
-    path 'install_complete.txt'
+    //path 'install_complete.txt'    // output from INSTALL_DEPENDENCIES process to kickstart db download
 
     output:
     path "metaphlan_db_latest"      , emit: db

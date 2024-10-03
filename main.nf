@@ -58,7 +58,7 @@ workflow NFCORE_METAPHLANSTRAINPHLAN {
         PROFILING.out.sam, 
         PROFILING.out.ch_final_dbs,
     )
-      
+    
     emit:
     multiqc_report = STRAIN_CHARACTERISATION.out.multiqc_report
 

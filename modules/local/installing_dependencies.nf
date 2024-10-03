@@ -36,7 +36,7 @@ process INSTALL_DEPENDENCIES {
     # Fetch latest version
     BASE_URL="https://ftp.ncbi.nlm.nih.gov/blast/executables/LATEST/"
 
-    echo "Use OS, \${OS}, and new architecture, \${ARCH}, to find appropriate file in \${BASE_URL}."
+    echo "Use OS, \${OS}, and architecture, \${ARCH}, to find appropriate file in \${BASE_URL}."
     
     # Silently list all files from BASE_URL, search and select most appropriate file for user's system using grep for basic regex matching; added extra escape '\' to interpret as bash
     LATEST_VERSION=\$(curl -s "\$BASE_URL" | grep -Eo "ncbi-blast-2\\.[0-9]+\\.[0-9]+\\+-\${ARCH}-\${OS}\\.tar\\.gz" | sort -V | tail -n 1)
@@ -56,11 +56,31 @@ process INSTALL_DEPENDENCIES {
     curl -L -O "\$DOWNLOAD_URL"
     tar -vxzf "\$LATEST_VERSION"
 
-    # Copy the binaries to /usr/local/bin and clean up
-    sudo cp "\$PWD/ncbi-blast-*/bin/*" "/usr/local/bin/"
+    # Use wildcard to match the extracted directory (assumes the prefix "ncbi-blast-" is consistent)
+    EXTRACTED_DIR=\$(find . -maxdepth 1 -type d -name "ncbi-blast-*" | head -1)
+
+    # Check if directory was extracted
+    if [ -z "\$EXTRACTED_DIR" ]; then
+        echo "Extracted directory not found."
+        exit 1
+    else
+        # Rename the extracted directory to 'ncbi-blast'
+        mv "\$EXTRACTED_DIR" ncbi-blast
+    fi
+
+    # Check existence of bin directory
+    if [ ! -d "ncbi-blast/bin" ]; then
+        echo "BLAST+ bin directory not found in renamed path."
+        exit 1
+    fi
+
+    # Copy binaries to /usr/local/bin and clean up
+    cp -r "ncbi-blast/bin/" "/usr/local/bin/"
     rm -rf "\$LATEST_VERSION"
 
     # Mark process completion
     touch install_complete.txt
+
     """
 }
+

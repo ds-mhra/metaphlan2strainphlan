@@ -2,4 +2,4 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - bioconda::metaphlan=4.1.1
+  - bioconda::bowtie2=2.5.2

@@ -4,7 +4,6 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { FASTQC                 } from '../modules/nf-core/fastqc/main'
 include { MULTIQC                } from '../modules/nf-core/multiqc/main'
 include { paramsSummaryMap       } from 'plugin/nf-validation'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -12,6 +11,8 @@ include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pi
 include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_metaphlanstrainphlan_pipeline'
 include { INSTALL_DEPENDENCIES   } from "../modules/local/installing_dependencies.nf"
 include { BLAST_MAKEBLASTDB      } from '../modules/nf-core/blast/makeblastdb/main'
+include { BOWTIE2_ALIGN          } from '../modules/nf-core/bowtie2/align/main'
+include { BOWTIE2_BUILD          } from '../modules/nf-core/bowtie2/build/main'
 include { METAPHLAN_MAKEDB       } from '../modules/nf-core/metaphlan/makedb/main'                                        
 include { METAPHLAN_METAPHLAN    } from '../modules/nf-core/metaphlan/metaphlan/main'                                                            
 include { METAPHLAN_MERGEMETAPHLANTABLES } from '../modules/nf-core/metaphlan/mergemetaphlantables/main'
@@ -25,7 +26,7 @@ include { STRAINPHLAN_STRAINPHLAN } from '../subworkflows/local/strain_character
 */
 
 ch_versions         = Channel.empty()  // Initialise globally
-ch_multiqc_files    = Channel.empty()
+ch_multiqc_files    = Channel.empty() 
 
 // Define workflow to prep and run MetaPhlAn   
 workflow PROFILING {
@@ -49,7 +50,8 @@ workflow PROFILING {
 
     } else if ( params.installdb ) {
         INSTALL_DEPENDENCIES()
-        ch_final_dbs = METAPHLAN_MAKEDB(INSTALL_DEPENDENCIES.out.dependenciesinstall).db
+        ch_final_dbs = METAPHLAN_MAKEDB().db
+        ch_versions = ch_versions.mix( METAPHLAN_MAKEDB.out.versions )
     }
 
     // Run alignment using MetaPhlAn 
@@ -79,6 +81,7 @@ workflow PROFILING {
 
 }
 
+
 // Define workflow to prep and/or run StrainPhlAn for strain characterisation
 workflow STRAIN_CHARACTERISATION {
 
@@ -93,15 +96,15 @@ workflow STRAIN_CHARACTERISATION {
     if ( params.run_strainphlan && !params.skip_strainphlan_prep ) {
         STRAINPHLAN_PREP ( 
             sam,
-//            METAPHLAN_METAPHLAN.out.sam,
+        //     METAPHLAN_METAPHLAN.out.sam,
             ch_final_dbs, []
-//            clade
+        //     clade
         )
 
         STRAINPHLAN_STRAINPHLAN (
             STRAINPHLAN_PREP.out,
             ch_final_dbs, []
-//            clade
+        //     clade
         )
 
     } else if ( params.skip_strainphlan_prep ) {
@@ -127,6 +130,7 @@ workflow STRAIN_CHARACTERISATION {
             sort: true,
             newLine: true
         ).set { ch_collated_versions }
+    
 
     //
     // MODULE: MultiQC

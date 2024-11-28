@@ -1,30 +1,24 @@
+//
+
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     IMPORT MODULES / SUBWORKFLOWS / FUNCTIONS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { UNTAR                  } from '../modules/nf-core/untar/main'
 //include { INPUT_CHECK            } from '../subworkflows/input_check'
-include { FASTP as FASTP_PAIRED  } from '../modules/nf-core/fastp/main'
-include { FASTP as FASTP_SINGLE  } from '../modules/nf-core/fastp/main'
-include { FASTQC as FASTQC_PRE   } from '../modules/nf-core/fastqc/main'
-include { FASTQC as FASTQC_POST  } from '../modules/nf-core/fastqc/main'
+include { UNTAR                  } from '../modules/nf-core/untar/main'
+include { FASTP as FASTP_PAIRED; FASTP as FASTP_SINGLE  } from '../modules/nf-core/fastp/main'
+include { FASTQC as FASTQC_PRE; FASTQC as FASTQC_POST   } from '../modules/nf-core/fastqc/main'
 include { MULTIQC                } from '../modules/nf-core/multiqc/main'
 include { paramsSummaryMap       } from 'plugin/nf-validation'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_metaphlanstrainphlan_pipeline'
 include { BBMAP_ALIGN            } from '../modules/nf-core/bbmap/align/main' 
-include { BBMAP_BBDUK as BBMAP_BBDUK_PAIRED; BBMAP_BBDUK as BBMAP_BBDUK_SINGLE } from '../modules/nf-core/bbmap/bbduk/main'
+include { BBMAP_BBDUK as BBMAP_BBDUK_PAIRED } from '../modules/nf-core/bbmap/bbduk/main'
+include { BBMAP_BBDUK as BBMAP_BBDUK_SINGLE } from '../modules/nf-core/bbmap/bbduk/main'
 include { BBMAP_BBMERGE          } from '../modules/nf-core/bbmap/bbmerge/main' 
-
-
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    RUN MAIN WORKFLOW
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
 
 
 /*
@@ -37,7 +31,7 @@ include { BBMAP_BBMERGE          } from '../modules/nf-core/bbmap/bbmerge/main'
 workflow PREPROCESSING {
 
     take:
-    ch_samplesheet     // channel: samplesheet read in from --input 
+    ch_samplesheet     // ch_samplesheet or ${params.samplesheet}; read in from --input or --samplesheet
     
     main:
     ch_versions                   = Channel.empty()
@@ -60,7 +54,7 @@ workflow PREPROCESSING {
         // ...create a channel from the samplesheet, parse it as separated R1nR2 reads, and branch into single- and paired-end samples
         ch_verified_samplesheet = Channel
             .fromPath(
-                "${params.samplesheet}",
+                params.samplesheet,
                 checkIfExists: true,
                 glob: true
             )
@@ -71,36 +65,41 @@ workflow PREPROCESSING {
             )
             // Reformat each row of samplesheet so it is easy to pass fastq_1 and fastq_2 columns into tools like fastqc; also handles single-end reads where fastq_2 is null or missing
             .map { row ->
-                // Map sample data with file checks by creating a tuple of sample metadata and fastq_files
-                def fastq_files = [
-                    row.fastq_1 ? file(row.fastq_1, checkIfExists: true) : error("Missing fastq_1 file for sample ${row.sample}"),    // Check for, and always include, fastq_1 (this includes SE and PE samples) 
-                ]
-
-                // Ensure row has an 'id' field
+                // Map sample data with file checks by creating a tuple of sample metadata (id) and fastq_files
                 def id = row.sample 
 
-                // Check if fastq_2 is available; if not, handle it accordingly
+                def fastq_files = [
+                    row.fastq_1 ? row.fastq_1 : error("Missing fastq file for sample ${id}"),    // Check for, and always include, fastq_1 (this includes SE and PE samples) 
+                ]
+
+                // Check if fastq_2 is available; if not, handle it accordingly and return list with 3 elements, 'sample', 'fastq, 'type'
                 if (row.fastq_2) {
-                    fastq_files << file(row.fastq_2, checkIfExists: true)           // Add fastq_2 if present
-                    return [id: row.sample, fastq_files: fastq_files, type: "paired"]                      // Return with a flag for paired reads
-                } else {
-                    return [id: row.sample, fastq_files: fastq_files, type: "single"]                      // Return with a flag for single reads
+                    fastq_files << row.fastq_2                                  // Append fastq_2 if present
                 }
-
-                // Return tuple ????????????????
-                //tuple(row.sample, fastq_files)
+                // Debugging: Print the structure before returning
+                println("Sample ID: ${id}, Fastq Files: ${fastq_files}")
+                return [id: id, fastq_files: fastq_files]       
             }
-
-        // Separate the channels based on the read type using a conditional structure
-        ch_samplesheet_single = ch_verified_samplesheet
-            .filter { it[2] == "single" }           // Filter and emit only single-end reads
-            .map { [it[0], it[1][0]] }              // Keep only sample and fastq_1
-
+        
+        // Modified channel splitting
         ch_samplesheet_paired = ch_verified_samplesheet
-            .filter { it[2] == "paired" }           // Filter and emit paired-end reads
-            .map { [it[0], it[1][0], it[1][1]] }    // Keep sample, fastq_1, and fastq_2
+            .filter { it.fastq_files?.size() == 2 }                         // ensures that fastq_2 exists 
+            .map { [[ id: it.id, single_end: false ], it.fastq_files] }     // since modules use {meta.id} to access the ID, the ID must be wrapped (nested) in the meta map while adding a single flag
+            .ifEmpty { log.warn "No paired-end samples found." }
+
+        ch_samplesheet_single = ch_verified_samplesheet
+            .filter { it.fastq_files?.size() == 1 }                         // ensures only fastq_1 exists
+            .map { [[ id: it.id, single_end: true ], it.fastq_files] }      
+            .ifEmpty { log.warn "No single-end samples found." }
+    
+            // Debugging channel structure
+            // ch_verified_samplesheet.view { "Original: $it" }
+            // ch_samplesheet_paired.view { "Debug BBDUK PE input: meta=${it[0]}, reads=${it[1]}" }
+            // ch_samplesheet_single.view { "Debug BBDUK SE input: meta=${it[0]}, reads=${it[1]}" }
+
 
     } else {
+
     // Make a channel with all of the files from the --input_folder
     ch_input_files = Channel
         .fromFilePairs([
@@ -112,24 +111,37 @@ workflow PREPROCESSING {
 
     //
     // SUB-WORKFLOW: QC checks for adapters, contaminants etc as well as preprocessing of single- paired-end reads w tools ie bbduk, fastqc, fastp
-
     //
     // MODULE: Run FastQC before processing
-    //
-    
+    // Filter out null or empty tuples in the paired-end and single-end channels, combine and use as input to fastqc
+    ch_samplesheet_paired = ch_samplesheet_paired.filter { it != null }
+    ch_samplesheet_single = ch_samplesheet_single.filter { it != null }
+
     FASTQC_PRE ( 
-        ch_samplesheet_paired.mix(ch_samplesheet_single) 
+        ch_samplesheet_paired.mix(ch_samplesheet_single)
     )
     ch_versions = ch_versions.mix(FASTQC_PRE.out.versions.first())
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC_PRE.out.zip.collect{it[1]})             
 
+
     // Perform QC if either perform_shortread_qc or a qc_tool is selected
     if (params.perform_shortread_qc || params.qc_tool) {
 
-        // Error message
+        // Error message:
         // Define the allowed tools list and esure it is treated as a list
         def allowed_qc_tools = ['bbduk', 'fastp', 'fastqc', 'bbmerge']
-        def selected_qc_tools = params.qc_tool instanceof List ? params.qc_tool : [params.qc_tool]
+    
+        // Convert params.qc_tool to a list, and handles different input formats on CLI
+        def selected_qc_tools = []
+        if (params.qc_tool instanceof String) {
+            // Handle comma-separated string and splits it up
+            selected_qc_tools = params.qc_tool.split(',').collect { it.trim() }
+        } else if (params.qc_tool instanceof List) {
+            // Handle list as input
+            selected_qc_tools = params.qc_tool
+        } else if (params.qc_tool != null) {
+            selected_qc_tools = [params.qc_tool.toString()]
+        }
 
         // After treating each tool like a list, validate that all selected tools are supported
         selected_qc_tools.each { tool ->
@@ -140,31 +152,54 @@ workflow PREPROCESSING {
 
         // If the qc_tool is 'bbduk', run BBDUK for QC trimming and filtering
         if (params.qc_tool.contains('bbduk')) {
+            
+            println "Processing with BBDUK..."
+            println "Debug: QC tool selection: ${selected_qc_tools}"    // shows list
+   
 
+            // If contaminants file is absent, use an empty list
             contaminants = params.shortread_qc_contaminantslist ? file(params.shortread_qc_contaminantslist) : []
 
-            if (params.shortread_qc_contaminantslist && !contaminants.extension.matches(".*(csv|tsv|txt)")) {
+            if (params.shortread_qc_contaminantslist && !contaminants.extension.matches(".*(fa|fasta|csv|tsv|txt)")) {
                 error "[metaphlan2strainphlanPipeline] ERROR: Contaminants or adapter list requires a different format and/or extension. Check input: --shortread_qc_contaminantslist ${params.shortread_qc_contaminantslist}"
             }
 
-            //
-            // MODULE: Run BBMAP_BBDUK
-            // Trim and filter paired-end reads with BBDUK
-            ch_shortreads_pe_preprocessed = BBMAP_BBDUK_PAIRED( 
-                ch_samplesheet_paired, contaminants
-            ).reads
-            
-            // Trim and filter single-end reads with BBDUK
-            ch_shortreads_se_preprocessed = BBMAP_BBDUK_SINGLE (
-                ch_samplesheet_single, contaminants  
-            ).reads
+            // Since Nextflow keeps interpreting and removing the gs://bucket_name in the file paths in favour of local directories
+            // Store absolute paths before BBDUK by converting to string and defining bucket_paths
+            ch_samplesheet_paired_tracked = ch_samplesheet_paired.map { id, fastq_files ->
+                id.original_paths = fastq_files.collect { it.toString() }            // modify id object by adding original_paths 
+                [id, fastq_files]
+            }
+                
 
+            //single
+            ch_samplesheet_single_tracked = ch_samplesheet_single.map { id, fastq_file ->
+                id.original_path = fastq_file.collect { it.toString() }
+                [id, fastq_file]
+            }
+             
+
+            // MODULE: Run BBMAP_BBDUK
+            // Trim and filter paired- and single-end reads with BBDUK
+            BBMAP_BBDUK_PAIRED( 
+                ch_samplesheet_paired_tracked, contaminants
+            )
+            ch_shortreads_pe_preprocessed = BBMAP_BBDUK_PAIRED.out.reads
+            ch_shortreads_pe_preprocessed.view { "BBDUK PE output: $it" }
+
+            BBMAP_BBDUK_SINGLE( 
+                ch_samplesheet_single_tracked, contaminants
+            )
+            ch_shortreads_se_preprocessed = BBMAP_BBDUK_SINGLE.out.reads
+            ch_shortreads_se_preprocessed.view { "BBDUK SE output: ${it}" } 
+          
             // Combine paired and single-ends into a single channel
             ch_shortreads_preprocessed = ch_shortreads_pe_preprocessed.mix(ch_shortreads_se_preprocessed)
             
             // Collect versions from BBDUK
             ch_versions = ch_versions.mix( BBMAP_BBDUK_PAIRED.out.versions )
             ch_versions = ch_versions.mix( BBMAP_BBDUK_SINGLE.out.versions )
+
 
         } else {
             // No BBDUK preprocessing, just pass through input reads to FASTQC
@@ -180,26 +215,29 @@ workflow PREPROCESSING {
         if (params.bbmerge_pairs) {
 
             BBMAP_BBMERGE ( ch_shortreads_pe_preprocessed, [] ).merged
-                // .map {
-                //     sample, reads ->
-                //         return [ sample + [single:true ], reads.flatten() ] // Flatten the reads list for each sample
-                // }
-                .set { ch_merged_reads_pe }            // ch_merged_reads = BBMAP_BBMERGE (ch_shortreads_preprocessed, []).merged   
+                .map { id, merged_fastq ->                              // change PE label on merged sample using `.map { }` so that it is marked as paired_end and merged
+                    [id + [merged: true], merged_fastq]                 
+                }
+                .set { ch_merged_reads_pe }
+            ch_merged_reads_pe.view { "Debug: ch_merged_reads_pe from BBMERGE set: $it" }   
 
-            //ch_merged_reads = ch_merged_reads_pe.mix(ch_shortreads_single_preprocessed) // unneeded as else statement takes care if not paired-end or merging not selected
-
+            final_input_reads = ch_merged_reads_pe.mix(ch_shortreads_se_preprocessed)
+                
             // Mix any output files 
             ch_versions = ch_versions.mix(BBMAP_BBMERGE.out.versions.first())
             
             // If not merging runs, use bbmerged reads as final input for metaphlan
             if ( !params.perform_runmerging ) {
-                final_input_reads = ch_merged_reads_pe 
+                final_input_reads = final_input_reads 
+            } else {
+                // ... perform run merging...
             }
         } else {
             
         // Ensure `final_input_reads` is assigned even if `bbmerge_pairs` is false
         final_input_reads = ch_shortreads_preprocessed
         }
+        final_input_reads.view { "Debug: FINAL final_input_reads set: $it" } 
 
         /*
             Run host removal, run_merge, etc... to be completed
@@ -207,6 +245,7 @@ workflow PREPROCESSING {
 
 
         // If the qc_tool is 'fastp', run fastp for QC trimming, filtering and merging
+        // NB. fastp shouldn't be run w bbmerge
         if (params.qc_tool.contains('fastp')) {
             ch_fastp_pe = FASTP_PAIRED ( 
                 ch_samplesheet_paired, contaminants 
@@ -214,16 +253,19 @@ workflow PREPROCESSING {
             ch_fastp_se = FASTP_SINGLE ( 
                 ch_samplesheet_single, contaminants 
             )
-        // Mix any output files
-        ch_multiqc_files = ch_multiqc_files
-            .mix(FASTP_PAIRED.out.zip.collect{it[1]})
-            .mix(FASTP_SINGLE.out.zip.collect{it[1]})
-        
-        ch_versions = ch_versions
-            .mix(FASTP_PAIRED.out.versions.first())
-            .mix(FASTP_SINGLE.out.versions.first())
-        
-        final_input_reads = ch_fastp_pe.reads.mix(ch_fastp_se.reads)
+            // Mix any output files
+            ch_multiqc_files = ch_multiqc_files
+                .mix(FASTP_PAIRED.out.zip.collect{it[1]})
+                .mix(FASTP_SINGLE.out.zip.collect{it[1]})
+            
+            ch_versions = ch_versions
+                .mix(FASTP_PAIRED.out.versions.first())
+                .mix(FASTP_SINGLE.out.versions.first())
+            
+            final_input_reads = ch_fastp_pe.reads.mix(ch_fastp_se.reads)
+        } else {
+            // No fastp preprocessing, just pass through input reads
+            ch_shortreads_preprocessed = ch_samplesheet_paired.mix(ch_samplesheet_single)
         }
 
         //
@@ -238,13 +280,13 @@ workflow PREPROCESSING {
             ch_versions = ch_versions.mix(FASTQC_POST.out.versions.first())
         }
     } else {
-        final_input_reads = ch_verified_samplesheet.paired.mix(ch_verified_samplesheet.single)
+        final_input_reads = ch_samplesheet_paired.mix(ch_samplesheet_single)       
     }
     
     emit:
     final_input_reads
     ch_multiqc_files
-    versions = ch_versions                 // channel: [ path(versions.yml) ]
+    versions = ch_versions 
 
 }
 

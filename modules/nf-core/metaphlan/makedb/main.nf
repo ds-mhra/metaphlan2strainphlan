@@ -1,7 +1,7 @@
 process METAPHLAN_MAKEDB {
     label 'process_medium'
 
-    conda "./metaphlan_env.yml"     // amended to custom .yml file
+    conda "./metaphlan_env.yaml"     // amended to custom .yaml file
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/metaphlan:4.1.1--pyhdfd78af_0' :
         'biocontainers/metaphlan:4.1.1--pyhdfd78af_0' }"

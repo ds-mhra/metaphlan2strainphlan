@@ -8,7 +8,7 @@ process INSTALL_DEPENDENCIES {
 
     //conda 'bioconda::blast bioconda::mafft bioconda::trimal bioconda::raxml'
     // for container image issue -profile gcb or conda - TBD
-    //conda "${moduleDir}/environment.yml"
+    //conda "./metaphlan_env.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/blast:2.15.0--pl5321h6f7f691_1':
         'biocontainers/blast:2.15.0--pl5321h6f7f691_1' }"
@@ -20,6 +20,8 @@ process INSTALL_DEPENDENCIES {
 
 
     script: 
+    def args = task.ext.args ?: ''
+
 
     """
     echo "Install BLAST/ BLAST+ Suite for tools such as 'makeblastdb', 'blastn' etc."

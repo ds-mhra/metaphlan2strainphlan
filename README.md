@@ -33,6 +33,9 @@
 
 1. Read QC ([`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
 2. Present QC for raw reads ([`MultiQC`](http://multiqc.info/))
+3. Preprocess [`fastQC|fastp|bbduk|bbmerge`]
+4. Download database and run profiling steps with MetaPhlAn4.1
+5. Characterise strains using StrainPhlAn
 
 ## Usage
 
@@ -60,10 +63,15 @@ Now, you can run the pipeline using:
 <!-- TODO nf-core: update the following command to include all required parameters for a minimal example -->
 
 ```bash
-nextflow run nf-core/metaphlanstrainphlan \
-   -profile <docker/singularity/.../institute> \
-   --input samplesheet.csv \
-   --outdir <OUTDIR>
+nextflow run nf-core-metaphlanstrainphlan \
+	-profile <docker/singularity/.../institute> \
+  --samplesheet samplesheet.csv \
+	--installdb \
+	--metaphlan_index mpa_vJun23_CHOCOPhlAnSGB_202403 \
+	--run_metaphlan --run_strainphlan \
+	--bbmerge_pairs \
+	--qc_tool 'bbduk,fastqc' \
+  --outdir <OUTDIR>
 ```
 
 > [!WARNING]

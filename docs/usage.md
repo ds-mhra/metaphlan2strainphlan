@@ -57,7 +57,15 @@ An [example samplesheet](../assets/samplesheet.csv) has been provided with the p
 The typical command for running the pipeline is as follows:
 
 ```bash
-nextflow run nf-core/metaphlanstrainphlan --input ./samplesheet.csv --outdir ./results --genome GRCh37 -profile docker
+nextflow run nf-core-metaphlanstrainphlan \
+	-profile docker,googlebatch \
+  --samplesheet samplesheet.csv \
+	--installdb \
+	--metaphlan_index mpa_vJun23_CHOCOPhlAnSGB_202403 \
+	--run_metaphlan --run_strainphlan \
+	--bbmerge_pairs \
+	--qc_tool 'bbduk,fastqc' \
+  --outdir ./results
 ```
 
 This will launch the pipeline with the `docker` configuration profile. See below for more information about profiles.

@@ -2,7 +2,7 @@
     "$schema": "http://json-schema.org/draft-07/schema",
     "$id": "https://raw.githubusercontent.com/nf-core/metaphlanstrainphlan/master/nextflow_schema.json",
     "title": "nf-core/metaphlanstrainphlan pipeline parameters",
-    "description": "Pipeline carries out taxonomy analysis on metagenomic sequencing by pre-processing reads and using metaphlan and strainphlan.",
+    "description": "Pipeline carries out taxonomy analysis on metagenomic sequencing by pre-processing reads and using metaphlan and strainphlan.\n",
     "type": "object",
     "definitions": {
         "input_output_options": {
@@ -10,19 +10,8 @@
             "type": "object",
             "fa_icon": "fas fa-terminal",
             "description": "Define where the pipeline should find input data and save output data.",
-            "required": ["input", "outdir"],
+            "required": ["outdir"],
             "properties": {
-                "input": {
-                    "type": "string",
-                    "format": "file-path",
-                    "exists": true,
-                    "schema": "assets/schema_input.json",
-                    "mimetype": "text/csv",
-                    "pattern": "^\\S+\\.csv$",
-                    "description": "Path to comma-separated file containing information about the samples in the experiment.",
-                    "help_text": "You will need to create a design file with information about the samples in your experiment before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 3 columns, and a header row. See [usage docs](https://nf-co.re/metaphlanstrainphlan/usage#samplesheet-input).",
-                    "fa_icon": "fas fa-file-csv"
-                },
                 "outdir": {
                     "type": "string",
                     "format": "directory-path",
@@ -40,85 +29,6 @@
                     "type": "string",
                     "description": "MultiQC report title. Printed as page header, used for filename if not otherwise specified.",
                     "fa_icon": "fas fa-file-signature"
-                }
-            }
-        },
-        "reference_genome_options": {
-            "title": "Reference genome options",
-            "type": "object",
-            "fa_icon": "fas fa-dna",
-            "description": "Reference genome related files and options required for the workflow.",
-            "properties": {
-                "genome": {
-                    "type": "string",
-                    "description": "Name of iGenomes reference.",
-                    "fa_icon": "fas fa-book",
-                    "help_text": "If using a reference genome configured in the pipeline using iGenomes, use this parameter to give the ID for the reference. This is then used to build the full paths for all required reference genome files e.g. `--genome GRCh38`. \n\nSee the [nf-core website docs](https://nf-co.re/usage/reference_genomes) for more details."
-                },
-                "fasta": {
-                    "type": "string",
-                    "format": "file-path",
-                    "exists": true,
-                    "mimetype": "text/plain",
-                    "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
-                    "description": "Path to FASTA genome file.",
-                    "help_text": "This parameter is *mandatory* if `--genome` is not specified. If you don't have a BWA index available this will be generated for you automatically. Combine with `--save_reference` to save BWA index for future runs.",
-                    "fa_icon": "far fa-file-code"
-                },
-                "igenomes_ignore": {
-                    "type": "boolean",
-                    "description": "Do not load the iGenomes reference config.",
-                    "fa_icon": "fas fa-ban",
-                    "hidden": true,
-                    "help_text": "Do not load `igenomes.config` when running the pipeline. You may choose this option if you observe clashes between custom parameters and those supplied in `igenomes.config`."
-                }
-            }
-        },
-        "institutional_config_options": {
-            "title": "Institutional config options",
-            "type": "object",
-            "fa_icon": "fas fa-university",
-            "description": "Parameters used to describe centralised config profiles. These should not be edited.",
-            "help_text": "The centralised nf-core configuration profiles use a handful of pipeline parameters to describe themselves. This information is then printed to the Nextflow log when you run a pipeline. You should not need to change these values when you run a pipeline.",
-            "properties": {
-                "custom_config_version": {
-                    "type": "string",
-                    "description": "Git commit id for Institutional configs.",
-                    "default": "master",
-                    "hidden": true,
-                    "fa_icon": "fas fa-users-cog"
-                },
-                "custom_config_base": {
-                    "type": "string",
-                    "description": "Base directory for Institutional configs.",
-                    "default": "https://raw.githubusercontent.com/nf-core/configs/master",
-                    "hidden": true,
-                    "help_text": "If you're running offline, Nextflow will not be able to fetch the institutional config files from the internet. If you don't need them, then this is not a problem. If you do need them, you should download the files from the repo and tell Nextflow where to find them with this parameter.",
-                    "fa_icon": "fas fa-users-cog"
-                },
-                "config_profile_name": {
-                    "type": "string",
-                    "description": "Institutional config name.",
-                    "hidden": true,
-                    "fa_icon": "fas fa-users-cog"
-                },
-                "config_profile_description": {
-                    "type": "string",
-                    "description": "Institutional config description.",
-                    "hidden": true,
-                    "fa_icon": "fas fa-users-cog"
-                },
-                "config_profile_contact": {
-                    "type": "string",
-                    "description": "Institutional config contact information.",
-                    "hidden": true,
-                    "fa_icon": "fas fa-users-cog"
-                },
-                "config_profile_url": {
-                    "type": "string",
-                    "description": "Institutional config URL link.",
-                    "hidden": true,
-                    "fa_icon": "fas fa-users-cog"
                 }
             }
         },
@@ -281,16 +191,180 @@
             "$ref": "#/definitions/input_output_options"
         },
         {
-            "$ref": "#/definitions/reference_genome_options"
-        },
-        {
-            "$ref": "#/definitions/institutional_config_options"
-        },
-        {
             "$ref": "#/definitions/max_job_request_options"
         },
         {
             "$ref": "#/definitions/generic_options"
         }
-    ]
+    ],
+    "properties": {
+        "samplesheet": {
+            "type": "string",
+            "description": "Path to comma-separated file containing information about the samples in the experiment.",
+            "format": "file-path",
+            "default": "samplesheet.csv",
+            "pattern": ".csv",
+            "help_text": "Can use --samplesheet or --input"
+        },
+        "input": {
+            "type": "string",
+            "pattern": ".csv",
+            "description": "Path to comma-separated file containing information about the samples in the experiment.",
+            "format": "file-path",
+            "schema": "assets/schema_input.json",
+            "mimetype": "text/csv"
+        },
+        "input_folder": {
+            "type": "string",
+            "description": "Path to directory containing fastq reads",
+            "format": "directory-path"
+        },
+        "file_suffix": {
+            "type": "string",
+            "default": ".fastq.gz",
+            "description": "Suffix of input reads"
+        },
+        "file_spacer": {
+            "type": "string",
+            "default": "_",
+            "description": "Spacer of input reads"
+        },
+        "cpus": {
+            "type": "integer",
+            "default": 16
+        },
+        "memory_gb": {
+            "type": "integer",
+            "default": 20
+        },
+        "skip_preprocessing_qc": {
+            "type": "boolean",
+            "description": "Skips preprocessing steps and starts profiling"
+        },
+        "perform_shortread_qc": {
+            "type": "boolean",
+            "default": true,
+            "description": "Performs preprocessing quality control steps on short reads"
+        },
+        "shortread_qc_contaminantslist": {
+            "type": "string",
+            "description": "List can contain adapters, contaminants etc."
+        },
+        "qc_tool": {
+            "type": "string",
+            "description": "Select QC tool and/or assessment to use for preprocessing"
+        },
+        "bbmerge_pairs": {
+            "type": "boolean",
+            "description": "Option to merge R1 and R2 short reads using bbmerge",
+            "default": true
+        },
+        "run_metaphlan": {
+            "type": "boolean",
+            "default": true,
+            "description": "Runs MetaPhlan4.0"
+        },
+        "metaphlan_db": {
+            "type": "string",
+            "description": "Directory containing MetaPhlan database",
+            "help_text": "Directory containing metaphlan database is specified here, if parameter is not selected, the latest database will be installed",
+            "format": "directory-path"
+        },
+        "s": {
+            "type": "boolean",
+            "default": true,
+            "description": "--samout flag for MetaPhlan to output .sam files alongside profiles"
+        },
+        "min_alignment_len": {
+            "type": "string",
+            "description": "MetaPhlan params"
+        },
+        "min_mapq_val": {
+            "type": "integer",
+            "default": 5,
+            "description": "MetaPhlan params"
+        },
+        "tax_lev": {
+            "type": "string",
+            "default": "a",
+            "description": "MetaPhlan params"
+        },
+        "min_cu_len": {
+            "type": "integer",
+            "default": 2000,
+            "description": "MetaPhlan params"
+        },
+        "add_viruses": {
+            "type": "boolean",
+            "description": "MetaPhlan params"
+        },
+        "ignore_eukaryotes": {
+            "type": "boolean",
+            "description": "MetaPhlan params"
+        },
+        "ignore_archaea": {
+            "type": "boolean",
+            "description": "MetaPhlan params"
+        },
+        "ignore_bacteria": {
+            "type": "boolean",
+            "description": "MetaPhlan params"
+        },
+        "unclassified_estimation": {
+            "type": "boolean",
+            "default": true,
+            "description": "MetaPhlan params"
+        },
+        "run_strainphlan": {
+            "type": "boolean",
+            "description": "Run StrainPhlan"
+        },
+        "mutation_rates": {
+            "type": "boolean",
+            "default": true,
+            "description": "StrainPhlan params"
+        },
+        "clade_markers": {
+            "type": "string",
+            "default": "./clade_markers/",
+            "description": "StrainPhlan params to use specified clade's .fna assembly"
+        },
+        "metadata": {
+            "type": "string",
+            "description": "Metadata .txt file for add_metadata_tree.py"
+        },
+        "monochromeLogs": {
+            "type": "boolean"
+        },
+        "strainphlan_clades": {
+            "type": "string",
+            "description": "A string of comma-separated clades. If empty, all clades obtained from MetaPhlAn's abundance profiles will be used."
+        },
+        "installdb": {
+            "type": "boolean",
+            "default": true
+        },
+        "metaphlan_index": {
+            "type": "string"
+        },
+        "genome": {
+            "type": "string"
+        },
+        "input_type": {
+            "type": "string",
+            "default": "fastq",
+            "description": "parameter for metaphlan, other options include 'sam'"
+        },
+        "reference_genomes": {
+            "type": "string",
+            "description": "upper level directory pointing to genomes (fasta)",
+            "help_text": "upper level directory pointing to genomes (.fasta, .fna), files downloaded from NCBI's datasets tool should point to ncbi_dataset",
+            "format": "path"
+        },
+        "strainphlan_db": {
+            "type": "string",
+            "format": "path"
+        }
+    },
+    "required": ["run_metaphlan", "samplesheet"]
 }

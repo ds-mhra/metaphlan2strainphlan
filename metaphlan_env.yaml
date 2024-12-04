@@ -1,0 +1,12 @@
+name: metaphlan_env
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+  - biobakery
+dependencies:
+  - python=3.8
+  - numpy
+  - biopython
+  - bioconda::bowtie2=2.5.2
+  - bioconda::metaphlan=4.1.1

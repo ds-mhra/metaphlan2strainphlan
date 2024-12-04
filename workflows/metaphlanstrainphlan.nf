@@ -1,3 +1,5 @@
+//
+
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     IMPORT MODULES / SUBWORKFLOWS / FUNCTIONS
@@ -66,6 +68,7 @@ workflow PROFILING {
 
         // Define db dir name based on the named index/ db_version if provided, otherwise use metaphlan_db_latest and define this as the directory
         // Set db full path for strainphlan
+<<<<<<< HEAD
         // def db_name = params.metaphlan_index ? "metaphlan_db_${params.metaphlan_index}" : 'metaphlan_db_latest'
         // OR simply: 
         def db_name = params.metaphlan_index ?: 'metaphlan_db_latest'
@@ -81,6 +84,12 @@ workflow PROFILING {
         println " db_name: ${db_name}      params.metaphlan_index: ${params.metaphlan_index} "
         //      println " params.metaphlan_index: ${params.metaphlan_index}    db_name: ${db_name}      params.metaphlan_index: ${params.metaphlan_index}      params.strainphlan_db: ${params.strainphlan_db}"
         //       params.metaphlan_db: null   params.metaphlan_index: mpa_vOct22_CHOCOPhlAnSGB_202212         params.strainphlan_db: gs://mhra-ngs-dev-ut8t-training/metaphlanstrainphlanTEST/mpa_vOct22_CHOCOPhlAnSGB_202212/*.pkl
+=======
+        def db_name = params.metaphlan_index ?: 'metaphlan_db_latest'
+
+        // DEBUG
+        println " db_name: ${db_name}      params.metaphlan_index: ${params.metaphlan_index} "
+>>>>>>> preprocess_metaphlan
 
     }
 
@@ -88,6 +97,7 @@ workflow PROFILING {
     if ( params.run_metaphlan ) {
         ch_raw_profiles         = Channel.empty()       // Count table/ taxonomy profiles
 
+<<<<<<< HEAD
         // final_input_reads.set{}
 
         // def (merged_reads, other_reads) = final_input_reads.branch {
@@ -99,6 +109,8 @@ workflow PROFILING {
         // }
         // ch_metaphlan_input = merged_reads_processed.mix(other_reads)
 
+=======
+>>>>>>> preprocess_metaphlan
         ch_metaphlan_input = final_input_reads.map { meta, reads ->
             if (meta.merged) {
                 // For merged paired-end reads, pass only the merged file
@@ -116,6 +128,7 @@ workflow PROFILING {
         ch_versions        = ch_versions.mix( METAPHLAN_METAPHLAN.out.versions.first() )
         ch_raw_profiles    = ch_raw_profiles.mix( METAPHLAN_METAPHLAN.out.profile )         // Mix profiles for each sample into a single channel
 
+<<<<<<< HEAD
         // Debug - SAM file output: Day_1B: /workdir/e1/4d66d6864353952e072551303fd3e9/Day_1B.sam.bz2
         // METAPHLAN_METAPHLAN.out.sam.view { sample, sam_file ->
         //     println "Debug - initial SAM file output: ${sample.id}: ${sam_file}"
@@ -134,6 +147,12 @@ workflow PROFILING {
         // .set { ch_sam_files }
 
 
+=======
+        // Debug
+        METAPHLAN_METAPHLAN.out.sam.view { sample, sam_file ->
+            println "Debug - initial SAM file output: ${sample.id}: ${sam_file}"
+        } 
+>>>>>>> preprocess_metaphlan
 
         // Merge all MetaPhlAn profiles
         // First re-map each sample id and its profile, then group all profiles by sample name and merge
@@ -180,6 +199,7 @@ workflow STRAIN_CHARACTERISATION {
 
     main:
 
+<<<<<<< HEAD
     // strainphlan_db = ch_final_dbs    // mapped and aliased ch_final_dbs to strainphlan_db
 
     // Convert the database path to a proper channel
@@ -191,6 +211,8 @@ workflow STRAIN_CHARACTERISATION {
     //         return pkl_path
     //     } // Using database from: /metaphlanstrainphlanTEST/metaphlan_db_latest/*.pkl
 
+=======
+>>>>>>> preprocess_metaphlan
     if ( params.run_strainphlan && !params.skip_strainphlan_prep ) {
 
         if (!params.reference_genomes){
@@ -204,6 +226,7 @@ workflow STRAIN_CHARACTERISATION {
             // reference_genomes = download_genomes
 
         } else {
+<<<<<<< HEAD
             // Use file() to keep original full paths of gc buckets as well as local paths, fromFilePairs() creates tuple id 
             // Channel
             //     .fromFilePairs(
@@ -222,6 +245,9 @@ workflow STRAIN_CHARACTERISATION {
             //     .set { all_references }
             // // Debug - Amended full path reference_genomes input: [id:GCA_008121495, ref_paths:[/231114-371_517-merged-fastq_ehillman/genome_downloads_complete/33038_ncbi_dataset/data/GCA_008121495.1/GCA_008121495.1_ASM812149v1_genomic.fna]] 
             // all_references.view { println " Amended full path reference_genomes input: $it " }
+=======
+            // Keep original full paths of gc buckets as well as local paths
+>>>>>>> preprocess_metaphlan
             Channel
                 .fromPath(
                     params.reference_genomes,
@@ -273,7 +299,11 @@ workflow STRAIN_CHARACTERISATION {
             clade = clades_list.splitText()
         }
 
+<<<<<<< HEAD
         // clade.view{ "all clades from list: $it" }
+=======
+        clade.view{ "all clades from list: $it" }
+>>>>>>> preprocess_metaphlan
 
         STRAINPHLAN_PREP_CONSENSUS (
             ch_sam_files,           //     METAPHLAN_METAPHLAN.out.sam,
@@ -327,7 +357,11 @@ workflow STRAIN_CHARACTERISATION {
             ch_clade,                       // Fifth: clade
             ch_marker_file                  // Sixth: fna_file
         )
+<<<<<<< HEAD
         // // works-sih
+=======
+        // 
+>>>>>>> preprocess_metaphlan
         // STRAINPHLAN_STRAINPHLAN (
         //     STRAINPHLAN_PREP_CONSENSUS.out.consensus_markers,
         //     strainphlan_db, //ch_final_dbs, 

@@ -10,8 +10,8 @@ process METAPHLAN_MERGEMETAPHLANTABLES {
     tuple val(meta), path(profiles)
 
     output:
-    tuple val(meta), path("${prefix}.txt") , emit: txt
-    path "versions.yml"                    , emit: versions
+    tuple val(meta), path("merged_abundance_table.txt")      , emit: txt
+    path "versions.yml"                                      , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -22,8 +22,7 @@ process METAPHLAN_MERGEMETAPHLANTABLES {
     """
     merge_metaphlan_tables.py \\
         $args \\
-        -o ${prefix}.txt \\
-        ${profiles}
+        ${profiles} > merged_abundance_table.txt
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

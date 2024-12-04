@@ -9,10 +9,6 @@ process STRAINPHLAN_PREP_CONSENSUS {
     container "quay.io/biocontainers/metaphlan:4.1.1--pyhdfd78af_0"
     cpus "${params.cpus}"
     memory "${params.memory_gb}.GB"
-<<<<<<< HEAD
-    //publishDir "${params.outdir}/strainphlan", "${params.publish_dir_mode}", overwrite: true
-=======
->>>>>>> preprocess_metaphlan
 
     input:
     tuple val(meta), path(sam)     // val sam 
@@ -105,19 +101,7 @@ process STRAINPHLAN_STRAINPHLAN {
     tuple val(meta), path(merged_profiles) // Fourth parameter
     val clade                          // Fifth parameter
     val fna_file                       // Sixth parameter
-<<<<<<< HEAD
-
-    // path strainphlan_db
-    // path "consensus_markers/*"
-    // tuple val(meta), path(merged_profiles) 
-    // // tuple val(clade), path(fna_file)  // tuple val(clade), path("clade_markers/*")           // val clade OR  path "clade_markers/*"   
-    // path all_references                  // optional ?!
-    // val clade
-    // val fna_file
-    // //path "phylophlan.config"                          // --phylophlan_configuration phylophlan.config 
-=======
     //path "phylophlan.config"                          // --phylophlan_configuration phylophlan.config 
->>>>>>> preprocess_metaphlan
     
 
     output:

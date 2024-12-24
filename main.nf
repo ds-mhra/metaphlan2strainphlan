@@ -47,11 +47,11 @@ Arguments:
   --bbmerge_pairs           Merge paired-end fastq files using BBMerge.
 
   MetaPhlAn:
-  --installdb       
+  --installdb
   
   --run_metaphlan           Run MetaPhlAn.
   
-  --metaphlan_index         Name of available databases ie `mpa_vJun23_CHOCOPhlAnSGB_202403`.
+  --metaphlan_index         Name of available databases ie `mpa_vJun23_CHOCOPhlAnSGB_202403`
   
   --metaphlan_db            Path to reference database, must not be used if installing.
                             (must include the prefix shared across reference files)
@@ -83,10 +83,10 @@ Arguments:
 
 
 //
-// WORKFLOW: Run metaPhlAn-2-strainPhlAn pipeline
-//  
+// WORKFLOW: Run MetaPhlAn-2-StrainPhlAn pipeline
+
 workflow NFCORE_METAPHLANSTRAINPHLAN {
-        
+
     take:
     ch_samplesheet                             // channel: reads from --input_folder or --samplesheet
 
@@ -103,20 +103,23 @@ workflow NFCORE_METAPHLANSTRAINPHLAN {
     // Run profiling with MetaPhlAn
     PROFILING (
         PREPROCESSING.out.final_input_reads,
+        PREPROCESSING.out.versions
     )
 
     // Extract clades from metaphlan results; download genomes w NCBI datasets
     METAPHLAN_TO_STRAINPHLAN (
-        PROFILING.out.ch_profiles
+        PROFILING.out.ch_profiles,
     )
 
     // Run characterisation of strains via StrainPhlAn
     STRAIN_CHARACTERISATION (
         PROFILING.out.ch_sam_files, 
         PROFILING.out.ch_final_dbs,
-        METAPHLAN_TO_STRAINPHLAN.out.clades_list, 
-        []
-        // all_references
+        METAPHLAN_TO_STRAINPHLAN.out.clades_list,
+        PROFILING.out.ch_profiles,
+        PREPROCESSING.out.ch_multiqc_files,
+        PROFILING.out.versions
+        // all_references 
     )
     
     emit:

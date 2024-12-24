@@ -25,9 +25,6 @@ include { BBMAP_BBMERGE          } from '../modules/nf-core/bbmap/bbmerge/main'
     WORKFLOW: PREPROCESSING
 */
 
-// Initialise empty channels
-
-
 workflow PREPROCESSING {
 
     take:
@@ -91,12 +88,6 @@ workflow PREPROCESSING {
             .filter { it.fastq_files?.size() == 1 }                         // ensures only fastq_1 exists
             .map { [[ id: it.id, single_end: true ], it.fastq_files] }      
             .ifEmpty { log.warn "No single-end samples found." }
-    
-            // Debugging channel structure
-            // ch_verified_samplesheet.view { "Original: $it" }
-            // ch_samplesheet_paired.view { "Debug BBDUK PE input: meta=${it[0]}, reads=${it[1]}" }
-            // ch_samplesheet_single.view { "Debug BBDUK SE input: meta=${it[0]}, reads=${it[1]}" }
-
 
     } else {
 
@@ -108,10 +99,10 @@ workflow PREPROCESSING {
         .ifEmpty { error "No file pairs found at ${params.input_folder}/*${params.file_spacer}{1,2}${params.file_suffix}" }
     }
 
-
     //
     // SUB-WORKFLOW: QC checks for adapters, contaminants etc as well as preprocessing of single- paired-end reads w tools ie bbduk, fastqc, fastp
     //
+
     // MODULE: Run FastQC before processing
     // Filter out null or empty tuples in the paired-end and single-end channels, combine and use as input to fastqc
     ch_samplesheet_paired = ch_samplesheet_paired.filter { it != null }
@@ -121,7 +112,7 @@ workflow PREPROCESSING {
         ch_samplesheet_paired.mix(ch_samplesheet_single)
     )
     ch_versions = ch_versions.mix(FASTQC_PRE.out.versions.first())
-    ch_multiqc_files = ch_multiqc_files.mix(FASTQC_PRE.out.zip.collect{it[1]})             
+    ch_multiqc_files = ch_multiqc_files.mix(FASTQC_PRE.out.zip.collect{ it[1] }.ifEmpty([]))
 
 
     // Perform QC if either perform_shortread_qc or a qc_tool is selected
@@ -154,8 +145,7 @@ workflow PREPROCESSING {
         if (params.qc_tool.contains('bbduk')) {
             
             println "Processing with BBDUK..."
-            println "Debug: QC tool selection: ${selected_qc_tools}"    // shows list
-   
+            println "Debug: QC tool selection: ${selected_qc_tools}"
 
             // If contaminants file is absent, use an empty list
             contaminants = params.shortread_qc_contaminantslist ? file(params.shortread_qc_contaminantslist) : []
@@ -165,19 +155,16 @@ workflow PREPROCESSING {
             }
 
             // Since Nextflow keeps interpreting and removing the gs://bucket_name in the file paths in favour of local directories
-            // Store absolute paths before BBDUK by converting to string and defining bucket_paths
+            // Store absolute paths before BBDUK by converting to string and defining bucket_paths in single and/or paired-ends
             ch_samplesheet_paired_tracked = ch_samplesheet_paired.map { id, fastq_files ->
-                id.original_paths = fastq_files.collect { it.toString() }            // modify id object by adding original_paths 
+                id.original_paths = fastq_files.collect { it.toString() }            // modify id object by adding original_paths
                 [id, fastq_files]
             }
-                
 
-            //single
             ch_samplesheet_single_tracked = ch_samplesheet_single.map { id, fastq_file ->
                 id.original_path = fastq_file.collect { it.toString() }
                 [id, fastq_file]
             }
-             
 
             // MODULE: Run BBMAP_BBDUK
             // Trim and filter paired- and single-end reads with BBDUK
@@ -185,14 +172,14 @@ workflow PREPROCESSING {
                 ch_samplesheet_paired_tracked, contaminants
             )
             ch_shortreads_pe_preprocessed = BBMAP_BBDUK_PAIRED.out.reads
-            ch_shortreads_pe_preprocessed.view { "BBDUK PE output: $it" }
+            // ch_shortreads_pe_preprocessed.view { "BBDUK PE output: $it" }
 
             BBMAP_BBDUK_SINGLE( 
                 ch_samplesheet_single_tracked, contaminants
             )
             ch_shortreads_se_preprocessed = BBMAP_BBDUK_SINGLE.out.reads
-            ch_shortreads_se_preprocessed.view { "BBDUK SE output: ${it}" } 
-          
+            // ch_shortreads_se_preprocessed.view { "BBDUK SE output: ${it}" } 
+
             // Combine paired and single-ends into a single channel
             ch_shortreads_preprocessed = ch_shortreads_pe_preprocessed.mix(ch_shortreads_se_preprocessed)
             
@@ -215,10 +202,10 @@ workflow PREPROCESSING {
 
             BBMAP_BBMERGE ( ch_shortreads_pe_preprocessed, [] ).merged
                 .map { id, merged_fastq ->                              // change PE label on merged sample using `.map { }` so that it is marked as paired_end and merged
-                    [id + [merged: true], merged_fastq]                 
+                    [id + [merged: true], merged_fastq]                 // OR merged_fastq.flatten()    // Flatten reads list for each sample, should remove null sample after merging
                 }
                 .set { ch_merged_reads_pe }
-            ch_merged_reads_pe.view { "Debug: ch_merged_reads_pe from BBMERGE set: $it" }   
+            // ch_merged_reads_pe.view { "Debug: ch_merged_reads_pe from BBMERGE set: $it" } 
 
             final_input_reads = ch_merged_reads_pe.mix(ch_shortreads_se_preprocessed)
                 
@@ -236,7 +223,8 @@ workflow PREPROCESSING {
         // Ensure `final_input_reads` is assigned even if `bbmerge_pairs` is false
         final_input_reads = ch_shortreads_preprocessed
         }
-        final_input_reads.view { "Debug: FINAL final_input_reads set: $it" } 
+        // final_input_reads.view { "Debug: FINAL final_input_reads set: $it" }
+
 
         /*
             Run host removal, run_merge, etc... to be completed
@@ -254,8 +242,10 @@ workflow PREPROCESSING {
             )
             // Mix any output files
             ch_multiqc_files = ch_multiqc_files
-                .mix(FASTP_PAIRED.out.zip.collect{it[1]})
-                .mix(FASTP_SINGLE.out.zip.collect{it[1]})
+                .mix(FASTP_PAIRED.out.json.collect { meta, json -> json })      //.collect{it[1]}.ifEmpty([]))
+                .mix(FASTP_PAIRED.out.html.collect { meta, html -> html })
+                .mix(FASTP_SINGLE.out.json.collect { meta, json -> json })      //.collect{it[1]}.ifEmpty([]))
+                .mix(FASTP_SINGLE.out.html.collect { meta, html -> html })
             
             ch_versions = ch_versions
                 .mix(FASTP_PAIRED.out.versions.first())
@@ -275,11 +265,11 @@ workflow PREPROCESSING {
                 final_input_reads 
             )
             // Mix any output files for MultiQC into a multiqc channel
-            ch_multiqc_files = ch_multiqc_files.mix(FASTQC_POST.out.zip.collect{it[1]})
+            ch_multiqc_files = ch_multiqc_files.mix(FASTQC_POST.out.zip.collect{ it[1] }.ifEmpty([]))
             ch_versions = ch_versions.mix(FASTQC_POST.out.versions.first())
         }
     } else {
-        final_input_reads = ch_samplesheet_paired.mix(ch_samplesheet_single)       
+        final_input_reads = ch_samplesheet_paired.mix(ch_samplesheet_single)
     }
     
     emit:
@@ -288,6 +278,7 @@ workflow PREPROCESSING {
     versions = ch_versions 
 
 }
+
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

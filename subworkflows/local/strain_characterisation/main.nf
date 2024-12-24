@@ -15,7 +15,7 @@ process STRAINPHLAN_PREP_CONSENSUS {
     path metaphlan_db_dir          // val ch_final_dbs
 
     output:
-    path "consensus_markers/*", optional: true                     , emit: consensus_markers
+    path "consensus_markers/*", optional: true                  , emit: consensus_markers
 
     def args = ext.args ?: ''
     """
@@ -34,7 +34,6 @@ process STRAINPHLAN_PREP_CONSENSUS {
         $args \\
         --nproc ${params.cpus}
 
-
     """
 
 }
@@ -50,14 +49,16 @@ process STRAINPHLAN_PREP_CLADES {
     container "quay.io/biocontainers/metaphlan:4.1.1--pyhdfd78af_0"
     cpus "${params.cpus}"
     memory "${params.memory_gb}.GB"
-    //publishDir "${params.outdir}/strainphlan", "${params.publish_dir_mode}", overwrite: true
 
     input:
-    path metaphlan_db_dir          // val ch_final_dbs
+    path metaphlan_db_dir
     val clade
 
     output:
-    tuple val(clade), path("clade_markers/${clade}.fna")  , optional: true      , emit: clade_markers     // changed from path "clade_markers/*" to tuple val(clade), path("clade_markers/*")
+    tuple val(clade), path("clade_markers/*"), optional: true      , emit: clade_markers
+    // path "versions.yml"                                                  , emit: versions
+    path "rejected_clades.txt", optional: true
+    path "parsed_clades.txt"  , optional: true
 
     def args = ext.args ?: ''
     """
@@ -71,10 +72,17 @@ process STRAINPHLAN_PREP_CLADES {
     echo "Processing clade: ${clade}"
 
     # Run extract_markers.py and capture errors
-    if ! extract_markers.py --database "\$PKL_DB" --clade "${clade}" --output_dir "clade_markers"; then
-        echo "Error: Clade ${clade} failed. Logging to rejected_clades.txt."
-        echo "${clade}" >> rejected_clades.txt
-        exit 0  # Allow the process to continue with other clades
+    extract_markers.py --database "\$PKL_DB" --clade "${clade}" --output_dir "clade_markers"
+
+    # If output contains an error message, concatenate to rejected_clades.txt, otherwise successful clades are parsed
+    command=\$(extract_markers.py --database "\$PKL_DB" --clade "${clade}" --output_dir "clade_markers" 2>&1)
+    if [[ "\$command" == *"Error"* ]]; then
+        [[ ! -f "rejected_clades.txt" ]] && touch "rejected_clades.txt"
+        echo "${clade}" >> "rejected_clades.txt"
+    else
+        [[ ! -f "parsed_clades.txt" ]] && touch "parsed_clades.txt" \
+        && echo "${clade} processed" 
+        echo "${clade}" >> "parsed_clades.txt"
     fi
 
     """
@@ -86,30 +94,39 @@ process STRAINPHLAN_PREP_CLADES {
 // Run StrainPhlan
 process STRAINPHLAN_STRAINPHLAN {
 
-    tag "$meta"
-    // tag "${meta.id}_${meta.clade}"
+    tag "${clade}_with_${strain_id}" 
     container "quay.io/biocontainers/metaphlan:4.1.1--pyhdfd78af_0"
     cpus "${params.cpus}"
     memory "${params.memory_gb}.GB"
-    // publishDir "${params.outdir}/strainphlan/", "${params.publish_dir_mode}", overwrite: true
+
+    // Skip process if no data is available for...
+    // when:
+    // reference_genome && strainphlan_db
 
     input:
-    path strainphlan_db                // First parameter
-    path "consensus_markers/*"         // Second parameter
-    // tuple val(meta), path(reference_genome)     //path all_references                // Third parameter
-    path reference_genome
-    tuple val(meta), path(merged_profiles) // Fourth parameter
-    val clade                          // Fifth parameter
-    val fna_file                       // Sixth parameter
-    //path "phylophlan.config"                          // --phylophlan_configuration phylophlan.config 
+    path strainphlan_db 
+    path consensus_markers 
+    tuple val(clade), path(reference_genome), path(clade_markers), val(species), val(strain_id) 
+
+
+            // path strainphlan_db                             // First parameter
+            // path consensus_markers                        // Second parameter
+            //         // tuple val(meta), path(reference_genome)     //path all_references                // Third parameter
+            // // path reference_genome         //all_references
+            // tuple val(meta), path(merged_profiles)          // Fourth parameter
+            // //tuple val(clade), path(clade_markers)       // Fifth parameter
+            // tuple val(clade), path(reference_genome), path(clade_markers)       // Fifth parameter "ADD SPECIES"
+            //     // val clade                                 // Fifth parameter
+            //     // path clade_fna                            // Sixth parameter
+            // path "phylophlan.config"                          // --phylophlan_configuration phylophlan.config 
     
 
+
     output:
-    // val "${clade}/*"                                               , emit: all
-    // path "*.tre", emit: tre_file
-    // path "${clade}/*"                           , emit: all
-    tuple val(clade), path("${clade}/*.tre")    , emit: tre_file        // tuple val(clade), path("${clade}/**/*.tre")     , emit: tre
-    path "species_to_clade_mapping.txt"
+    tuple val(clade), path("${species}/${strain_id}/*")                                    , emit: strainphlan_outputs
+    tuple val(clade), path("${species}/${strain_id}/RAxML_bestTree.*.StrainPhlAn4.tre")    , emit: tre_file        // tuple val(clade), path("${clade}/**/*.tre")     , emit: tre
+    // path "versions.yml"                         , emit: versions
+    
 
     script:
     def args = task.ext.args ?: ''
@@ -118,74 +135,51 @@ process STRAINPHLAN_STRAINPHLAN {
     #!/bin/bash
     set -e
 
-    # Ensure consensus_markers directory is not empty
-    if [ ! "\$(ls -A "consensus_markers/*" 2>/dev/null)" ]; then
-        echo "No consensus markers found. Exiting..."
-        exit 1
-    fi
+    # Ensure consensus_markers files are present
+    echo $consensus_markers
 
-    # Ensure clade_markers directory is not empty or .fna does not exist for the specified clade, proceed with the next
-    if [ ! "\$(ls -A "${fna_file}" 2>/dev/null)" ]; then
+    # Ensure clade_markers directory is not empty, if .fna does not exist for the specified clade, proceed with the next
+    if [ -z $clade_markers ]; then
         echo "No clade marker file found for clade, "${clade}". Skipping..."
         exit 0  
+    else
+        echo "Clade file(s): $clade_markers"
     fi
 
     # Check reference files exist
-    if [ ! "\$(ls -A ${reference_genome} 2>/dev/null)" ]; then
+    if [ ! -f "$reference_genome" ]; then
         echo "No reference genomes found. Exiting..."
+        exit 1
+    else
+        echo "Reference genomes found: $reference_genome"
+    fi
+
+    # Create directories and verify
+    mkdir -p "tmp"
+    mkdir -p "${species}/${strain_id}"
+
+    echo "Creating directory: ${species}/${strain_id} \n\n"
+    if [ ! -d "${species}/${strain_id}" ]; then
+        echo "Failed to create directory: ${species}/${strain_id}"
         exit 1
     fi
 
-
-    # Prep and create mapping file
-    mkdir -p "{tmp,\${clade}}"
-    mapping_file="species_to_clade_mapping.txt"
-    echo "species_name clade" > "\$mapping_file"
-    grep -E "t__" ${merged_profiles} \\
-        | awk -F'|' '{print \$1,\$2}' \\
-        | sed 's/s__//g' \\
-        >> "\$mapping_file"
-
-
-    # Run StrainPhlAn loop for each clade and matching reference
-    for fna in ${reference_genome}
-    do
-        echo "Processing reference genome: \$fna"
-                #ref_name=\$(basename \$fna .fna)
-                #output_dir="strainphlan_output/\${clade}/\${ref_name}"
-
-
-        # Attempt multiple name matching
-        ref_match=\$(basename "\${fna}" .fna)
-        clade_match=\$(grep "\$ref_match" "\$mapping_file" | cut -d' ' -f2)
-
-        if [ -z "\$clade_match" ]; then
-            echo "No matching clade for \${fna}. Skipping..."
-            continue
-        fi
-
-
-        printf '\n\nProcessing clade: %s\n ' "\$clade_match"
-        printf '\n\nProcessing reference genome: %s\n ' "\$ref_match"
-
-        # StrainPhlAn 
-        strainphlan --samples "consensus_markers/*.json.bz2" \\
-            --database "${strainphlan_db}" \\
-            --clade_markers "${fna_file}" \\
-            --output_dir "${clade}" \\
-            --clade "${clade}" \\
-            --phylophlan_mode fast \\
-            --mutation_rates --nproc "${params.cpus}" --debug \\
-            --tmp "tmp" \\
-            $args \\
-            --references "\${fna}" 
-
-    done
+    # Run StrainPhlAn for each clade and matching reference, while listing the consensus marker files
+    strainphlan --samples $consensus_markers \\
+        --database $strainphlan_db \\
+        --clade_markers $clade_markers \\
+        --output_dir "${species}/${strain_id}" \\
+        --clade "${clade}" \\
+        --phylophlan_mode fast \\
+        --mutation_rates --nproc "${params.cpus}" --debug \\
+        --tmp "tmp" \\
+        $args \\
+        --references $reference_genome 
 
     # Clean up
     echo "Cleaning up temporary files..."
-    rm -rf tmp/*
-    printf '\n\nStrainPhlAn has finished processing clade: %s\n' "\$clade"
+    rm -rf "tmp/*"
+    printf '\nStrainPhlAn has finished processing clade: %s, for the reference strain: %s' "${clade}" "${strain_id}"
 
     """
 }
@@ -194,39 +188,46 @@ process STRAINPHLAN_STRAINPHLAN {
 // Add metadata to StrainPhlan tree results
 process STRAINPHLAN_METADATA {
 
-    // Container to run process
+    // Container and resources
     container "quay.io/biocontainers/metaphlan:4.1.1--pyhdfd78af_0"
-
-    // Resources used
     cpus "${params.cpus}"
     memory "${params.memory_gb}.GB"
-    publishDir "${params.outdir}/strainphlan/strainphlan_output", "${params.publish_dir_mode}", overwrite: true, pattern: "*.tre.metadata"
 
     input:
     tuple val(clade), path(tre)
-    path("metadata.txt")
+    path metadata
+    // val add_metadata_field
 
     output:
     tuple val(clade), path("${tre}.*")
 
     """
-    echo "Adding metadata to ${tre}"
+    echo "Adding metadata to $tre"
 
-    for clade_path in "${params.outdir}"/strainphlan/strainphlan_output/*
-    do
-        clade=\$(basename "$clade_path")
-        printf '%s\n' "Strain/ Clade: $clade"
-        ls "${clade_path}/RAxML_bestTree.${clade}.StrainPhlAn4.tre" | while IFS= read -r tre_path
-        do
-            treeFile=\$(basename "$tre_path")
-            printf '%s\n' "$treeFile"
-            add_metadata_tree.py --ifn_trees $tre_path \\
-                --ifn_metadata metadata.txt \\
-                --string_to_remove *_merged.fastq.gz \\
-                --metadatas sampleID
-        done
-    done
+    if [[ -f $metadata ]]; then
+
+        add_metadata_field=\$(head -n 1 $metadata | cut -f 1)
+        add_metadata_field == "sampleID"
+        
+    else
+        echo "Error: File not found or file does not have sampleID as the first header."
+        exit 1
+    fi
+
+    add_metadata_tree.py --ifn_trees ${tre} \\
+        --ifn_metadata metadata.txt \\
+        --string_to_remove *_merged.fastq.gz \\
+        --metadatas ${add_metadata_field}
+
+
+    plot_tree_graphlan.py \\
+        --ifn_tree ${tre}.metadata \\
+        --colorized_metadata $colorized_metadata_field \\
+        --leaf_marker_size 60 --legend_marker_size 60 \\
+        || true     # ignore error, exits with status zero
+
 
     """
+
 }
 

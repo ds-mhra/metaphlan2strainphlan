@@ -106,11 +106,10 @@ workflow PROFILING {
                 return [meta, reads]
             }
         }
-        ch_metaphlan_input.view{ "ch_metaphlan_input $it " }
 
         METAPHLAN_METAPHLAN ( 
             ch_metaphlan_input, 
-            ch_final_dbs 
+            ch_final_dbs.first()        // since channel contains 1 entry, .first() converts queue channel into a value channel, allowing it to be reused, identify entry w `ch_final_dbs.count().view { "No of database entries: $it" } `
         )
         ch_versions        = ch_versions.mix( METAPHLAN_METAPHLAN.out.versions.first() )
         ch_raw_profiles    = ch_raw_profiles.mix( METAPHLAN_METAPHLAN.out.profile )         // Mix profiles for each sample into a single channel
@@ -251,18 +250,19 @@ workflow STRAIN_CHARACTERISATION {
 
         STRAINPHLAN_PREP_CONSENSUS (
             ch_sam_files,           //     METAPHLAN_METAPHLAN.out.sam,
-            ch_final_dbs            //  strainphlan_db, 
+            ch_final_dbs.first()            //  strainphlan_db, 
         )
 
         STRAINPHLAN_PREP_CLADES (
-            ch_final_dbs,
+            ch_final_dbs.first(),
             clade
         )
-        
                 
         // Split clade tuple into separate channels
         STRAINPHLAN_PREP_CLADES.out.clade_markers
             .set { ch_clade_markers }
+
+        // Debug
         ch_clade_markers.view { " ch_clade_markers: $it "}  // [t__SGB4936, /workdir/68/6905dbe8e85007019549cf74e17572/clade_markers/t__SGB4936.fna]
 
             // ch_clade_markers.map { clade, fna_file ->
@@ -466,8 +466,8 @@ workflow STRAIN_CHARACTERISATION {
         // STRAINPHLAN_STRAINPHLAN.out.tre_file.view { ".tre files $it" }
 
         STRAINPHLAN_METADATA(
-            STRAINPHLAN_STRAINPHLAN.out.tre_file,
-            ch_metadata
+            STRAINPHLAN_STRAINPHLAN.out.tre_file.toList().flatten(),
+            ch_metadata.first()
         )
     }
 

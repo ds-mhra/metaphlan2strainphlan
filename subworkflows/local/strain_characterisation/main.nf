@@ -124,7 +124,7 @@ process STRAINPHLAN_STRAINPHLAN {
 
     output:
     tuple val(clade), path("${species}/${strain_id}/*")                                    , emit: strainphlan_outputs
-    tuple val(clade), path("${species}/${strain_id}/RAxML_bestTree.*.StrainPhlAn4.tre")    , emit: tre_file        // tuple val(clade), path("${clade}/**/*.tre")     , emit: tre
+    tuple val(clade), val(species), val(strain_id), path("${species}/${strain_id}/RAxML_bestTree.*.StrainPhlAn4.tre")    , emit: tre_file        // tuple val(clade), path("${clade}/**/*.tre")     , emit: tre
     // path "versions.yml"                         , emit: versions
     
 
@@ -189,43 +189,48 @@ process STRAINPHLAN_STRAINPHLAN {
 process STRAINPHLAN_METADATA {
 
     // Container and resources
+    tag "metadata_${species}_${strain_id}_${tre}" 
+    // container "quay.io/biocontainers/graphlan:1.1.3--0"
     container "quay.io/biocontainers/metaphlan:4.1.1--pyhdfd78af_0"
     cpus "${params.cpus}"
     memory "${params.memory_gb}.GB"
+    // publishDir "${params.outdir}/strainphlan/strainphlan_output/${species}/${strain_id}/", mode: params.publish_dir_mode, overwrite: true
 
     input:
-    tuple val(clade), path(tre)
+    tuple val(clade), val(species), val(strain_id), path(tre)     // tuple val(clade), path("${species}/${strain_id}/RAxML_bestTree.*.StrainPhlAn4.tre") 
     path metadata
     // val add_metadata_field
 
     output:
-    tuple val(clade), path("${tre}.*")
+    path("${species}/${strain_id}/${tre}.*")   // tuple val(clade), path("${tre}.*")
+
+    script:
+    def args = task.ext.args ?: ''
 
     """
     echo "Adding metadata to $tre"
+    mkdir -p "${species}/${strain_id}"
 
     if [[ -f $metadata ]]; then
-
         add_metadata_field=\$(head -n 1 $metadata | cut -f 1)
-        add_metadata_field == "sampleID"
-        
     else
-        echo "Error: File not found or file does not have sampleID as the first header."
+        echo "Error: File $metadata not found and first header must be 'sampleID'."
         exit 1
     fi
 
     add_metadata_tree.py --ifn_trees ${tre} \\
-        --ifn_metadata metadata.txt \\
+        --ifn_metadata $metadata \\
         --string_to_remove *_merged.fastq.gz \\
-        --metadatas ${add_metadata_field}
+        --metadatas \$add_metadata_field
 
 
     plot_tree_graphlan.py \\
         --ifn_tree ${tre}.metadata \\
-        --colorized_metadata $colorized_metadata_field \\
+        $args \\
         --leaf_marker_size 60 --legend_marker_size 60 \\
-        || true     # ignore error, exits with status zero
+        || true     # ignore error if any, and exit with status zero
 
+    echo 'Finished plotting metadata for ${species} strain, ${strain_id}.'
 
     """
 

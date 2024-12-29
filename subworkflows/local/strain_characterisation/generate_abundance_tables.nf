@@ -7,7 +7,7 @@ process GENERATE_ABUNDANCE_TABLES {
         'biocontainers/grep:3.4--hf43ccf4_4' }"
 
     input:
-    tuple val(meta), path(merged_profiles)      // metaphlan_results="${params.outdir}/metaphlan/metaphlan_combined_profile_report.txt"
+    tuple val(meta), path(merged_profiles)
 
     output:
     tuple val(meta), path("merged_abundance_table_species.txt")     , emit: species_abundance
@@ -22,20 +22,21 @@ process GENERATE_ABUNDANCE_TABLES {
     # 1) Generate species-level abundance table
     # 2) Obtain taxon genus and species names only, remove underscore from genus names and add fullstop if any taxon names contains 'sp'
     #   ie isolate headers matching t__ (SGB level), remove excess info and simplify sample names
-    # changed to t__ from s_ SO CHECK!!!!!!!!
     echo "Generating species-level abundance table..."
     grep -E "s__" ${merged_profiles} \\
         | grep -v "t__" \\
         | sed "s/^.*|//g" \\
-        | tee "merged_abundance_table_species.txt"
+        | cat <(head -n 2 ${merged_profiles}) - \\
+        > "merged_abundance_table_species.txt"
 
 
     # Generate strain-/ SGB-level abundance table
     echo "Generating strain-/SGB-level abundance table..."
     grep -E "t__" ${merged_profiles} \\
         | sed "s/^.*|//g" \\
+        | cat <(head -n 2 ${merged_profiles}) - \\
         | tee "merged_abundance_table_strains.txt" \\
-        | cut -f1 \\
+        | grep -E "^t__" | cut -f1 \\
         > "taxons_list.txt" \\
         && echo "Generating taxons list..."
 
@@ -44,11 +45,11 @@ process GENERATE_ABUNDANCE_TABLES {
     echo "Generating abundance overview..."
     grep -E "t__" ${merged_profiles} \\
         | sed "s/^\\(.*|\\)\\(.*|\\)/\\2/" \\
+        | cat <(head -n 2 ${merged_profiles}) - \\
         > "overview_abundance_table_species_strain.txt"
 
     echo "Abundance tables completed!"
 
     """
 }
-
 

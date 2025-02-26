@@ -70,7 +70,7 @@ nextflow run nf-core-metaphlanstrainphlan \
 This pipeline can be launched with different profiles such as `docker` and `gcb` configurations. 
 
 > [!WARNING]
-> **NOTE: the `gcb` profile in the nextflow.config will need to be amended to match user's own google credentials. E.g. `bucket_name` and `project_id` in the file should be filled in.**
+> **NOTE: the `gcb` profile in the nextflow.config will need to be amended to match user's own google credentials. E.g. `serviceAccountEmail`, `bucket_name` and `project_id` in the file should be filled in or amended.**
 
 See below for more information about profiles.
 

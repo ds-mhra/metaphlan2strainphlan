@@ -1,24 +1,49 @@
 # nf-core/metaphlanstrainphlan: Usage
 
-## :warning: Please read this documentation on the nf-core website: [https://nf-co.re/metaphlanstrainphlan/usage](https://nf-co.re/metaphlanstrainphlan/usage)
+## :warning: Please read this documentation before running the pipeline.
 
 > _Documentation of pipeline parameters is generated automatically from the pipeline schema and can no longer be found in markdown files._
 
 ## Introduction
 
-<!-- TODO nf-core: Add documentation about anything specific to running your pipeline. For general topics, please point to (and add to) the main nf-core website. -->
+This pipeline runs both MetaPhlAn 4.1 and StrainPhlAn 4.0 from the biobakery collection to analyse metagenomic shotgun sequencing data. The former allows users to profile the composition of microbial communities while the latter characterises sample sets to a strain-level resolution of the species of interest.
+
+Please refer to the tools' Github repository:
+- https://github.com/biobakery/biobakery/wiki/MetaPhlAn-4.1
+- https://github.com/biobakery/biobakery/wiki/strainphlan4
+
 
 ## Samplesheet input
 
-You will need to create a samplesheet with information about the samples you would like to analyse before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 3 columns, and a header row as shown in the examples below.
+Create a samplesheet with information about the samples to be analysed prior to running the pipeline. This can be done manually or by running the *metaphlan_samplesheet.sh* script. 
 
 ```bash
---input '[path to samplesheet file]'
+bash nf-core-metaphlanstrainphlan/bin/metaphlan_samplesheet.sh "[fastq directory]" "[samplesheet name]"
 ```
+<br>
+
+The final samplesheet file must be a comma-separated (.csv) file with at least 3 columns, and a header row as shown in the example below. 
+
+The pipeline will auto-detect whether a sample is single- or paired-end using the information provided in the samplesheet, simply leave `fastq_2` empty.
+
+```csv title="samplesheet.csv"
+sample,fastq_1,fastq_2
+SAMPLE1,SAMPLE1_S1_L002_R1_001.fastq.gz,SAMPLE1_S1_L002_R2_001.fastq.gz
+SAMPLE2,SAMPLE2_S1_L003_R1_001.fastq.gz,SAMPLE2_S1_L003_R2_001.fastq.gz
+SAMPLE3,SAMPLE3_S1_L004_R1_001.fastq.gz,
+```
+<br>
+
+Use the `--samplesheet` parameter to specify its location. 
+
+```bash
+--samplesheet '[path to samplesheet file]'
+```
+<br>
 
 ### Multiple runs of the same sample
 
-The `sample` identifiers have to be the same when you have re-sequenced the same sample more than once e.g. to increase sequencing depth. The pipeline will concatenate the raw reads before performing any downstream analysis. Below is an example for the same sample sequenced across 3 lanes:
+The `sample` identifiers have to be the same when users have re-sequenced the same sample more than once e.g. to increase sequencing depth. The pipeline will concatenate the raw reads before performing any downstream analysis. Below is an example for the same sample sequenced across 3 lanes:
 
 ```csv title="samplesheet.csv"
 sample,fastq_1,fastq_2
@@ -27,65 +52,123 @@ CONTROL_REP1,AEG588A1_S1_L003_R1_001.fastq.gz,AEG588A1_S1_L003_R2_001.fastq.gz
 CONTROL_REP1,AEG588A1_S1_L004_R1_001.fastq.gz,AEG588A1_S1_L004_R2_001.fastq.gz
 ```
 
-### Full samplesheet
 
-The pipeline will auto-detect whether a sample is single- or paired-end using the information provided in the samplesheet. The samplesheet can have as many columns as you desire, however, there is a strict requirement for the first 3 columns to match those defined in the table below.
+| Column    |Description             |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sample`  | Custom sample name. This entry will be identical for multiple sequencing libraries/runs from the same sample. Ensure any spaces in sample names are converted to underscores (_). |
+| `fastq_1` | Full path to FastQ file for reads 1. File has to be gzipped and have the extension ".fastq.gz" or ".fq.gz".                                                             |
+| `fastq_2` | Full path to FastQ file for reads 2. File has to be gzipped and have the extension ".fastq.gz" or ".fq.gz".                                                             |
+<br>
 
-A final samplesheet file consisting of both single- and paired-end data may look something like the one below. This is for 6 samples, where `TREATMENT_REP3` has been sequenced twice.
+## Genomes list input
+If `--run_strainphlan` is used, genome reference files can be included in the StrainPhlAn analysis.
+The optional genome_list file must be a comma-separated (.csv) file with at least 5 columns, and a header row as shown in the example below. 
 
-```csv title="samplesheet.csv"
-sample,fastq_1,fastq_2
-CONTROL_REP1,AEG588A1_S1_L002_R1_001.fastq.gz,AEG588A1_S1_L002_R2_001.fastq.gz
-CONTROL_REP2,AEG588A2_S2_L002_R1_001.fastq.gz,AEG588A2_S2_L002_R2_001.fastq.gz
-CONTROL_REP3,AEG588A3_S3_L002_R1_001.fastq.gz,AEG588A3_S3_L002_R2_001.fastq.gz
-TREATMENT_REP1,AEG588A4_S4_L003_R1_001.fastq.gz,
-TREATMENT_REP2,AEG588A5_S5_L003_R1_001.fastq.gz,
-TREATMENT_REP3,AEG588A6_S6_L003_R1_001.fastq.gz,
-TREATMENT_REP3,AEG588A6_S6_L004_R1_001.fastq.gz,
+The file contains relevant metadata in regards to the reference species/strains with and can be done manually or by running the *list_genomes.sh* script. The final two fields must be filled manually.
+
+NB. 
+- All fields are compulsory, except the `taxonID`. 
+- This pipeline specifically looks for *.fna* files in a directory structure similar to that of NCBI downloads (please see below).
+
+```bash
+bash nf-core-metaphlanstrainphlan/bin/list_genomes.sh '[path to reference_1]' '[path to reference_2]' '[path to genome_list file].csv'
+```
+<br>
+
+```csv title="genome_list.csv"
+ref_genome_strainID,ref_genome_path,species_name,taxonID,associated_clade
+GCA_000123456.1,Escherichia coli_ncbi_dataset/data/GCA_000123456.1/GCA_000123456.1_ASM12345v1_genomic.fna,Escherichia coli,,t__SGB10068
 ```
 
-| Column    | Description                                                                                                                                                                            |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sample`  | Custom sample name. This entry will be identical for multiple sequencing libraries/runs from the same sample. Spaces in sample names are automatically converted to underscores (`_`). |
-| `fastq_1` | Full path to FastQ file for Illumina short reads 1. File has to be gzipped and have the extension ".fastq.gz" or ".fq.gz".                                                             |
-| `fastq_2` | Full path to FastQ file for Illumina short reads 2. File has to be gzipped and have the extension ".fastq.gz" or ".fq.gz".                                                             |
 
-An [example samplesheet](../assets/samplesheet.csv) has been provided with the pipeline.
+| Column    |Description             |
+| --------- | ----------------------------------------------------- |
+| `ref_genome_strainID`  | Strain ID name. Can be found in the file name. This entry will be unique for each strain listed. |
+| `ref_genome_path` | Full path to the strain's reference genome ".fna". This can be local or in cloud storage. |
+| `species_name` | Provide full scientific name.   |
+| `taxonID` | NCBI Taxonomy ID number.  |
+| `associated_clade` | Associated clade name, can be found in MetaPhlAn results or a taxonomy database.  |
+
+### Reference genome directory structure
+Based on NCBI downloads.
+```
+genome_directory/
+  └── species_name_ncbi_dataset/
+      └── data/
+          └── strain_name/
+              └── strain_name.fna
+```
+<br>
 
 ## Running the pipeline
 
-The typical command for running the pipeline is as follows:
+The typical default command for running the pipeline is as follows:
 
 ```bash
 nextflow run nf-core-metaphlanstrainphlan \
-	-profile docker,googlebatch \
+	-profile <docker/singularity/gcb/...> \
   --samplesheet samplesheet.csv \
-	--installdb \
-	--metaphlan_index mpa_vJun23_CHOCOPhlAnSGB_202403 \
+	--installdb --metaphlan_index mpa_vJun23_CHOCOPhlAnSGB_202403 \
 	--run_metaphlan --run_strainphlan \
 	--bbmerge_pairs \
 	--qc_tool 'bbduk,fastqc' \
-  --outdir ./results
+  --outdir './results'
 ```
 
-This will launch the pipeline with the `docker` configuration profile. See below for more information about profiles.
+This will launch the pipeline with the `docker` and `gcb` configuration profile. 
+
+**NOTE: the `gcb` profile in the nextflow.config will need to be amended to match user's own google credentials. E.g. `bucket_name` and `project_id` in the file should be filled in.**
+
+See below for more information about profiles.
 
 Note that the pipeline will create the following files in your working directory:
 
 ```bash
-work                # Directory containing the nextflow working files
+work                # Directory containing nextflow working files
 <OUTDIR>            # Finished results in specified location (defined with --outdir)
 .nextflow_log       # Log file from Nextflow
 # Other nextflow hidden files, eg. history of pipeline runs and old logs.
 ```
 
-If you wish to repeatedly use the same parameters for multiple runs, rather than specifying each flag in the command, you can specify these in a params file.
+### Preprocessing:
+QC_TOOLS available: `fastqc`, `fastp`, `bbduk`
 
-Pipeline settings can be provided in a `yaml` or `json` file via `-params-file <file>`.
+The pipeline is able to intake single- and paired-end reads, pre-process the files according to the selected quality control (QC) tool, and subsequently merge any pairs with BBMap, via `--bbmerge_pairs`.
 
-:::warning
-Do not use `-c <file>` to specify parameters as this will result in errors. Custom config files specified with `-c` must only be used for [tuning process resource specifications](https://nf-co.re/docs/usage/configuration#tuning-workflow-resources), other infrastructural tweaks (such as output directories), or module arguments (args).
-:::
+### Running MetaPhlAn and StrainPhlAn
+
+If `--installdb` is selected, users will need to specify the index database name, ie `--metaphlan_index mpa_vJun23_CHOCOPhlAnSGB_202403`, if this is not specified, the latest version is downloaded automatically.
+
+If an index database is already present, simply use `--metaphlan_db` to direct to the top-level directory containing the index. The pipeline will search for the *.PKL* file within this directory, however, if `--strainphlan_db` is specified, it must point to the *.PKL* file within this directory.
+
+Note that MetaPhlAn can be run without StrainPhlAn. The preparation for StrainPhlAn (e.g. creating consensus markers and extracting clade markers) can be skipped with `--skip_strainphlan_prep` however, the directory containing these files must be specified in addition to the clade of interest via `--strainphlan_clades` and the reference genome list.
+
+
+## Parameters:
+```
+usage: nextflow run nf-core-metaphlanstrainphlan
+	[--bbmerge_pairs]
+	[--qc_tool QC_TOOLS] [--shortread_qc_contaminantslist ADAPTERS_FILE] [--perform_shortread_qc] [--skip_preprocessing_qc]
+  [--run_metaphlan] [--run_strainphlan] [--skip_strainphlan_prep]
+	[--installdb] [--metaphlan_index MPA_INDEX_NAME]
+  [--metaphlan_db DATABASE_DIR] [--strainphlan_db DATABASE_PKL]
+  [--reference_genomes GENOME_LIST_FILE]
+  [--strainphlan_clades CLADE_NAME]
+  [--consensus_markers MARKER_DIR] [--clade_markers CLADE_DIR] [--metadata STRAINPHLAN_METADATA_FILE]
+	[--graphlan_plots]
+  [-profile <docker,googlebatch>]
+  [-h]
+  [--samplesheet INPUT_FILE] [OUTPUT_DIR]
+
+```
+<br>
+
+*Note [graphlan_annotate.py](../bin/graphlan_annotate.py) and [graphlan.py](../bin/graphlan.py) scripts can be used.*
+
+<br>
+
+### -params-file
+To repeatedly use the same parameters for multiple runs, rather than specifying each flag in the command, users can supply a params file in a `yaml` or `json` format via `-params-file <file>`.
 
 The above pipeline run specified with a params file in yaml format:
 
@@ -93,17 +176,22 @@ The above pipeline run specified with a params file in yaml format:
 nextflow run nf-core/metaphlanstrainphlan -profile docker -params-file params.yaml
 ```
 
-with `params.yaml` containing:
+with `params.yaml` containing something like:
 
 ```yaml
-input: './samplesheet.csv'
+samplesheet: './samplesheet.csv'
 outdir: './results/'
-genome: 'GRCh37'
+bbmerge_pairs: true
 <...>
 ```
 
-You can also generate such `YAML`/`JSON` files via [nf-core/launch](https://nf-co.re/launch).
+:warning:
+Do not use `-c <file>` to specify parameters as this may result in errors. Custom config files specified with `-c` should only be used for [tuning process resource specifications](https://nf-co.re/docs/usage/configuration#tuning-workflow-resources), other infrastructural tweaks (such as output directories), or module arguments (args).
+<br>
 
+
+
+## Extra information
 ### Updating the pipeline
 
 When you run the above command, Nextflow automatically pulls the pipeline code from GitHub and stores it as a cached version. When running the pipeline after this, it will always use the cached version if available - even if the pipeline has been updated since. To make sure that you're running the latest version of the pipeline, make sure that you regularly update the cached version of the pipeline:
@@ -114,40 +202,29 @@ nextflow pull nf-core/metaphlanstrainphlan
 
 ### Reproducibility
 
-It is a good idea to specify a pipeline version when running the pipeline on your data. This ensures that a specific version of the pipeline code and software are used when you run your pipeline. If you keep using the same tag, you'll be running the same version of the pipeline, even if there have been changes to the code since.
+It is a good idea to specify a pipeline version when running the pipeline on your data to ensure a specific version of the pipeline code and software are used.
 
-First, go to the [nf-core/metaphlanstrainphlan releases page](https://github.com/nf-core/metaphlanstrainphlan/releases) and find the latest pipeline version - numeric only (eg. `1.3.1`). Then specify this when running the pipeline with `-r` (one hyphen) - eg. `-r 1.3.1`. Of course, you can switch to another version by changing the number after the `-r` flag.
+First, go to the Github page releases directory and find the latest pipeline version - numeric only (eg. `1.3.1`) if available. Specify this when running the pipeline with `-r` (one hyphen) - eg. `-r 1.3.1` and it will be logged in the output reports.
 
-This version number will be logged in reports when you run the pipeline, so that you'll know what you used when you look back in the future. For example, at the bottom of the MultiQC reports.
 
-To further assist in reproducbility, you can use share and re-use [parameter files](#running-the-pipeline) to repeat pipeline runs with the same settings without having to write out a command with every single parameter.
-
-:::tip
+Tip
 If you wish to share such profile (such as upload as supplementary material for academic publications), make sure to NOT include cluster specific paths to files, nor institutional specific profiles.
 :::
 
-## Core Nextflow arguments
+### Core Nextflow arguments
 
-:::note
-These options are part of Nextflow and use a _single_ hyphen (pipeline parameters use a double-hyphen).
-:::
+#### `-profile`
 
-### `-profile`
-
-Use this parameter to choose a configuration profile. Profiles can give configuration presets for different compute environments.
-
-Several generic profiles are bundled with the pipeline which instruct the pipeline to use software packaged using different methods (Docker, Singularity, Podman, Shifter, Charliecloud, Apptainer, Conda) - see below.
+Use this parameter to choose a configuration profile.
 
 :::info
-We highly recommend the use of Docker or Singularity containers for full pipeline reproducibility, however when this is not possible, Conda is also supported.
+Using Docker or Singularity containers is highly recommend for full pipeline reproducibility, however when this is not possible, Conda is also supported.
 :::
-
-The pipeline also dynamically loads configurations from [https://github.com/nf-core/configs](https://github.com/nf-core/configs) when it runs, making multiple config profiles for various institutional clusters available at run time. For more information and to see if your system is available in these configs please see the [nf-core/configs documentation](https://github.com/nf-core/configs#documentation).
 
 Note that multiple profiles can be loaded, for example: `-profile test,docker` - the order of arguments is important!
 They are loaded in sequence, so later profiles can overwrite earlier profiles.
 
-If `-profile` is not specified, the pipeline will run locally and expect all software to be installed and available on the `PATH`. This is _not_ recommended, since it can lead to different results on different machines dependent on the computer enviroment.
+If `-profile` is not specified, the pipeline will run locally and expect all software to be installed and available on the `PATH`. This is _not_ recommended, since it can lead to different results on different machines dependent on the computer environment.
 
 - `test`
   - A profile with a complete configuration for automated testing
@@ -156,75 +233,28 @@ If `-profile` is not specified, the pipeline will run locally and expect all sof
   - A generic configuration profile to be used with [Docker](https://docker.com/)
 - `singularity`
   - A generic configuration profile to be used with [Singularity](https://sylabs.io/docs/)
-- `podman`
-  - A generic configuration profile to be used with [Podman](https://podman.io/)
-- `shifter`
-  - A generic configuration profile to be used with [Shifter](https://nersc.gitlab.io/development/shifter/how-to-use/)
-- `charliecloud`
-  - A generic configuration profile to be used with [Charliecloud](https://hpc.github.io/charliecloud/)
-- `apptainer`
-  - A generic configuration profile to be used with [Apptainer](https://apptainer.org/)
-- `wave`
-  - A generic configuration profile to enable [Wave](https://seqera.io/wave/) containers. Use together with one of the above (requires Nextflow ` 24.03.0-edge` or later).
 - `conda`
   - A generic configuration profile to be used with [Conda](https://conda.io/docs/). Please only use Conda as a last resort i.e. when it's not possible to run the pipeline with Docker, Singularity, Podman, Shifter, Charliecloud, or Apptainer.
 
-### `-resume`
+#### `-resume`
 
 Specify this when restarting a pipeline. Nextflow will use cached results from any pipeline steps where the inputs are the same, continuing from where it got to previously. For input to be considered the same, not only the names must be identical but the files' contents as well. For more info about this parameter, see [this blog post](https://www.nextflow.io/blog/2019/demystifying-nextflow-resume.html).
 
 You can also supply a run name to resume a specific run: `-resume [run-name]`. Use the `nextflow log` command to show previous run names.
 
-### `-c`
+#### `-c`
 
 Specify the path to a specific config file (this is a core Nextflow command). See the [nf-core website documentation](https://nf-co.re/usage/configuration) for more information.
 
-## Custom configuration
 
-### Resource requests
-
-Whilst the default requirements set within the pipeline will hopefully work for most people and with most input data, you may find that you want to customise the compute resources that the pipeline requests. Each step in the pipeline has a default set of requirements for number of CPUs, memory and time. For most of the steps in the pipeline, if the job exits with any of the error codes specified [here](https://github.com/nf-core/rnaseq/blob/4c27ef5610c87db00c3c5a3eed10b1d161abf575/conf/base.config#L18) it will automatically be resubmitted with higher requests (2 x original, then 3 x original). If it still fails after the third attempt then the pipeline execution is stopped.
-
-To change the resource requests, please see the [max resources](https://nf-co.re/docs/usage/configuration#max-resources) and [tuning workflow resources](https://nf-co.re/docs/usage/configuration#tuning-workflow-resources) section of the nf-core website.
-
-### Custom Containers
-
-In some cases you may wish to change which container or conda environment a step of the pipeline uses for a particular tool. By default nf-core pipelines use containers and software from the [biocontainers](https://biocontainers.pro/) or [bioconda](https://bioconda.github.io/) projects. However in some cases the pipeline specified version maybe out of date.
-
-To use a different container from the default container or conda environment specified in a pipeline, please see the [updating tool versions](https://nf-co.re/docs/usage/configuration#updating-tool-versions) section of the nf-core website.
-
-### Custom Tool Arguments
-
-A pipeline might not always support every possible argument or option of a particular tool used in pipeline. Fortunately, nf-core pipelines provide some freedom to users to insert additional parameters that the pipeline does not include by default.
-
-To learn how to provide additional arguments to a particular tool of the pipeline, please see the [customising tool arguments](https://nf-co.re/docs/usage/configuration#customising-tool-arguments) section of the nf-core website.
-
-### nf-core/configs
-
-In most cases, you will only need to create a custom config as a one-off but if you and others within your organisation are likely to be running nf-core pipelines regularly and need to use the same settings regularly it may be a good idea to request that your custom config file is uploaded to the `nf-core/configs` git repository. Before you do this please can you test that the config file works with your pipeline of choice using the `-c` parameter. You can then create a pull request to the `nf-core/configs` repository with the addition of your config file, associated documentation file (see examples in [`nf-core/configs/docs`](https://github.com/nf-core/configs/tree/master/docs)), and amending [`nfcore_custom.config`](https://github.com/nf-core/configs/blob/master/nfcore_custom.config) to include your custom profile.
-
-See the main [Nextflow documentation](https://www.nextflow.io/docs/latest/config.html) for more information about creating your own configuration files.
-
-If you have any questions or issues please send us a message on [Slack](https://nf-co.re/join/slack) on the [`#configs` channel](https://nfcore.slack.com/channels/configs).
-
-## Azure Resource Requests
-
-To be used with the `azurebatch` profile by specifying the `-profile azurebatch`.
-We recommend providing a compute `params.vm_type` of `Standard_D16_v3` VMs by default but these options can be changed if required.
-
-Note that the choice of VM size depends on your quota and the overall workload during the analysis.
-For a thorough list, please refer the [Azure Sizes for virtual machines in Azure](https://docs.microsoft.com/en-us/azure/virtual-machines/sizes).
-
-## Running in the background
-
-Nextflow handles job submissions and supervises the running jobs. The Nextflow process must run until the pipeline is finished.
+#### Running in the background
 
 The Nextflow `-bg` flag launches Nextflow in the background, detached from your terminal so that the workflow does not stop if you log out of your session. The logs are saved to a file.
 
 Alternatively, you can use `screen` / `tmux` or similar tool to create a detached session which you can log back into at a later time.
-Some HPC setups also allow you to run nextflow within a cluster job submitted your job scheduler (from where it submits more jobs).
 
-## Nextflow memory requirements
+
+#### Nextflow memory requirements
 
 In some cases, the Nextflow Java virtual machines can start to request a large amount of memory.
 We recommend adding the following line to your environment to limit this (typically in `~/.bashrc` or `~./bash_profile`):

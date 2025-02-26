@@ -7,7 +7,7 @@
 */
 
 //include { INPUT_CHECK            } from '../subworkflows/input_check'
-include { UNTAR                  } from '../modules/nf-core/untar/main'
+// include { UNTAR                  } from '../modules/nf-core/untar/main'
 include { FASTP as FASTP_PAIRED; FASTP as FASTP_SINGLE  } from '../modules/nf-core/fastp/main'
 include { FASTQC as FASTQC_PRE; FASTQC as FASTQC_POST   } from '../modules/nf-core/fastqc/main'
 include { MULTIQC                } from '../modules/nf-core/multiqc/main'
@@ -120,7 +120,7 @@ workflow PREPROCESSING {
 
         // Error message:
         // Define the allowed tools list and esure it is treated as a list
-        def allowed_qc_tools = ['bbduk', 'fastp', 'fastqc', 'bbmerge']
+        def allowed_qc_tools = ['bbduk', 'fastp', 'fastqc']
     
         // Convert params.qc_tool to a list, and handles different input formats on CLI
         def selected_qc_tools = []
@@ -160,6 +160,7 @@ workflow PREPROCESSING {
                 id.original_paths = fastq_files.collect { it.toString() }            // modify id object by adding original_paths
                 [id, fastq_files]
             }
+            // ch_samplesheet_paired_tracked.view { "ch_samplesheet_paired_tracked output: $it" }
 
             ch_samplesheet_single_tracked = ch_samplesheet_single.map { id, fastq_file ->
                 id.original_path = fastq_file.collect { it.toString() }
@@ -172,13 +173,13 @@ workflow PREPROCESSING {
                 ch_samplesheet_paired_tracked, contaminants
             )
             ch_shortreads_pe_preprocessed = BBMAP_BBDUK_PAIRED.out.reads
-            // ch_shortreads_pe_preprocessed.view { "BBDUK PE output: $it" }
+            ch_shortreads_pe_preprocessed.view { "BBDUK PE output: $it" }
 
             BBMAP_BBDUK_SINGLE( 
                 ch_samplesheet_single_tracked, contaminants
             )
             ch_shortreads_se_preprocessed = BBMAP_BBDUK_SINGLE.out.reads
-            // ch_shortreads_se_preprocessed.view { "BBDUK SE output: ${it}" } 
+            ch_shortreads_se_preprocessed.view { "BBDUK SE output: ${it}" } 
 
             // Combine paired and single-ends into a single channel
             ch_shortreads_preprocessed = ch_shortreads_pe_preprocessed.mix(ch_shortreads_se_preprocessed)
@@ -189,7 +190,7 @@ workflow PREPROCESSING {
 
         } else {
             // No BBDUK preprocessing, just pass through input reads to FASTQC
-            ch_shortreads_preprocessed = ch_samplesheet_paired.mix(ch_samplesheet_single)
+            ch_shortreads_preprocessed = ch_samplesheet_paired_tracked.mix(ch_samplesheet_single_tracked)
         }
 
         //

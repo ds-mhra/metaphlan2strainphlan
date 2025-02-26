@@ -1,8 +1,8 @@
 /*
-    Create series of processes for StrainPhlan
+    Create series of processes for StrainPhlAn
 */
 
-// Runs preparation for StrainPhlan on MetaPhlan's merged profile output
+// Runs preparation for StrainPhlAn on MetaPhlAn's merged profile output
 process STRAINPHLAN_PREP_CONSENSUS {
 
     tag "$meta.id"
@@ -11,8 +11,8 @@ process STRAINPHLAN_PREP_CONSENSUS {
     memory "${params.memory_gb}.GB"
 
     input:
-    tuple val(meta), path(sam)     // val sam 
-    path metaphlan_db_dir          // val ch_final_dbs
+    tuple val(meta), path(sam) 
+    path metaphlan_db_dir      
 
     output:
     path "consensus_markers/*", optional: true                  , emit: consensus_markers
@@ -56,7 +56,6 @@ process STRAINPHLAN_PREP_CLADES {
 
     output:
     tuple val(clade), path("clade_markers/*"), optional: true      , emit: clade_markers
-    // path "versions.yml"                                                  , emit: versions
     path "rejected_clades.txt", optional: true
     path "parsed_clades.txt"  , optional: true
 
@@ -99,34 +98,14 @@ process STRAINPHLAN_STRAINPHLAN {
     cpus "${params.cpus}"
     memory "${params.memory_gb}.GB"
 
-    // Skip process if no data is available for...
-    // when:
-    // reference_genome && strainphlan_db
-
     input:
     path strainphlan_db 
     path consensus_markers 
     tuple val(clade), path(reference_genome), path(clade_markers), val(species), val(strain_id) 
 
-
-            // path strainphlan_db                             // First parameter
-            // path consensus_markers                        // Second parameter
-            //         // tuple val(meta), path(reference_genome)     //path all_references                // Third parameter
-            // // path reference_genome         //all_references
-            // tuple val(meta), path(merged_profiles)          // Fourth parameter
-            // //tuple val(clade), path(clade_markers)       // Fifth parameter
-            // tuple val(clade), path(reference_genome), path(clade_markers)       // Fifth parameter "ADD SPECIES"
-            //     // val clade                                 // Fifth parameter
-            //     // path clade_fna                            // Sixth parameter
-            // path "phylophlan.config"                          // --phylophlan_configuration phylophlan.config 
-    
-
-
     output:
     tuple val(clade), path("${species}/${strain_id}/*")                                    , emit: strainphlan_outputs
-    tuple val(clade), val(species), val(strain_id), path("${species}/${strain_id}/RAxML_bestTree.*.StrainPhlAn4.tre")    , emit: tre_file        // tuple val(clade), path("${clade}/**/*.tre")     , emit: tre
-    // path "versions.yml"                         , emit: versions
-    
+    tuple val(clade), val(species), val(strain_id), path("${species}/${strain_id}/RAxML_bestTree.*.StrainPhlAn4.tre")    , emit: tre_file     
 
     script:
     def args = task.ext.args ?: ''
@@ -189,30 +168,27 @@ process STRAINPHLAN_STRAINPHLAN {
 process STRAINPHLAN_METADATA {
 
     // Container and resources
-    tag "metadata_${species}_${strain_id}_${tre}" 
-    // container "quay.io/biocontainers/graphlan:1.1.3--0"
+    tag "metadata_${species}_${strain_id}_${clade}" 
     container "quay.io/biocontainers/metaphlan:4.1.1--pyhdfd78af_0"
     cpus "${params.cpus}"
     memory "${params.memory_gb}.GB"
-    // publishDir "${params.outdir}/strainphlan/strainphlan_output/${species}/${strain_id}/", mode: params.publish_dir_mode, overwrite: true
 
     input:
-    tuple val(clade), val(species), val(strain_id), path(tre)     // tuple val(clade), path("${species}/${strain_id}/RAxML_bestTree.*.StrainPhlAn4.tre") 
-    path metadata
-    // val add_metadata_field
+    tuple val(clade), val(species), val(strain_id), path(tre) 
+    path metadata    // val add_metadata_field
 
     output:
-    path("${species}/${strain_id}/${tre}.*")   // tuple val(clade), path("${tre}.*")
+    tuple val(clade), val(species), val(strain_id), path("${species}/${strain_id}/${tre}.metadata")
 
     script:
     def args = task.ext.args ?: ''
 
     """
     echo "Adding metadata to $tre"
-    mkdir -p "${species}/${strain_id}"
 
     if [[ -f $metadata ]]; then
         add_metadata_field=\$(head -n 1 $metadata | cut -f 1)
+        echo \$add_metadata_field
     else
         echo "Error: File $metadata not found and first header must be 'sampleID'."
         exit 1
@@ -223,12 +199,8 @@ process STRAINPHLAN_METADATA {
         --string_to_remove *_merged.fastq.gz \\
         --metadatas \$add_metadata_field
 
-
-    plot_tree_graphlan.py \\
-        --ifn_tree ${tre}.metadata \\
-        $args \\
-        --leaf_marker_size 60 --legend_marker_size 60 \\
-        || true     # ignore error if any, and exit with status zero
+    mkdir -p "${species}/${strain_id}"
+    cp ${tre}.metadata ${species}/${strain_id}/${tre}.metadata
 
     echo 'Finished plotting metadata for ${species} strain, ${strain_id}.'
 
@@ -236,3 +208,33 @@ process STRAINPHLAN_METADATA {
 
 }
 
+
+// to be added to main subworkflow
+process GRAPHPHLAN_PLOTTING {
+
+    // Container and resources
+    tag "graphlan_${species}_${strain_id}_${tre}" 
+    container "quay.io/biocontainers/graphlan:1.1.3--0"
+    cpus "${params.cpus}"
+    memory "${params.memory_gb}.GB"
+
+    input:
+    tuple val(clade), path("${species}/${strain_id}/${tre}.*")
+
+    output:
+    path("${species}/${strain_id}/${tre}.*")
+
+    script:
+    def args = task.ext.args ?: ''
+
+    """
+    echo "GraphPhlAn is plotting ${tre}"
+
+    plot_tree_graphlan.py \\
+        --ifn_tree ${tre}.metadata \\
+        $args \\
+        --leaf_marker_size 60 --legend_marker_size 60 \\
+        || true     # ignore error if any, and exit with status zero
+    
+    """
+}

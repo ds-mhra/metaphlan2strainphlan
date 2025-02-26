@@ -23,7 +23,7 @@ include { GENERATE_ABUNDANCE_TABLES } from '../subworkflows/local/strain_charact
 // include { RETRY_DOWNLOADS         } from '../subworkflows/local/strain_characterisation/download_genomes.nf'
 
 include { STRAINPHLAN_PREP_CONSENSUS; STRAINPHLAN_PREP_CLADES  } from '../subworkflows/local/strain_characterisation'
-include { STRAINPHLAN_STRAINPHLAN; STRAINPHLAN_METADATA        } from '../subworkflows/local/strain_characterisation'
+include { STRAINPHLAN_STRAINPHLAN; STRAINPHLAN_METADATA; GRAPHPHLAN_PLOTTING        } from '../subworkflows/local/strain_characterisation'
 
 
 
@@ -45,15 +45,14 @@ workflow PROFILING {
 
     // Prep specified database or use `metaphlan --install --bowtie2db metaphlan_db_latest`
     if ( params.metaphlan_db ) {
-        Channel
-            .fromPath( "${params.metaphlan_db}" )
-            .ifEmpty { error "No database found at ${params.metaphlan_db}." }
-            // .toSortedList() //.toList()
-            .set { ch_final_dbs }
+        INSTALL_DEPENDENCIES()
 
-        // UNTAR( db_ch )
-        // ch_versions = ch_versions.mix(UNTAR.out.versions.first())
-        // ch_final_dbs = UNTAR.out.untar
+        Channel
+            .value(params.metaphlan_db)  // Ensures the full path remains intact OR .fromPath( "${params.metaphlan_db}" )
+            .ifEmpty { error "No database found at ${params.metaphlan_db}." }
+            .set { ch_final_dbs }
+        
+        ch_final_dbs.view{ "ch_final_dbs is at $it "}
 
     } else if ( params.installdb ) {
 
@@ -64,38 +63,15 @@ workflow PROFILING {
 
         // Define db dir name based on the named index/ db_version if provided, otherwise use metaphlan_db_latest and define this as the directory
         // Set db full path for strainphlan
-        // def db_name = params.metaphlan_index ? "metaphlan_db_${params.metaphlan_index}" : 'metaphlan_db_latest'
-        // OR simply: 
         def db_name = params.metaphlan_index ?: 'metaphlan_db_latest'
-
-        // def strainphlan_db = "${db_name}/*.pkl"          // must add tp println      strainphlan_db: ${strainphlan_db}
-        // def strainphlan_db = db_name.findAll { it.endsWith('.pkl') }
-
-
-        //params.metaphlan_db = db_name  
-        //params.strainphlan_db = "${params.outdir}/${params.metaphlan_index}/*.pkl"
 
         // DEBUG
         println " db_name: ${db_name}      params.metaphlan_index: ${params.metaphlan_index} "
-        //      println " params.metaphlan_index: ${params.metaphlan_index}    db_name: ${db_name}      params.metaphlan_index: ${params.metaphlan_index}      params.strainphlan_db: ${params.strainphlan_db}"
-        //       params.metaphlan_db: null   params.metaphlan_index: mpa_vOct22_CHOCOPhlAnSGB_202212         params.strainphlan_db: gs://mhra-ngs-dev-ut8t-training/metaphlanstrainphlanTEST/mpa_vOct22_CHOCOPhlAnSGB_202212/*.pkl
-
     }
 
     // Run alignment using MetaPhlAn 
     if ( params.run_metaphlan ) {
         ch_raw_profiles         = Channel.empty()       // Count table/ taxonomy profiles
-
-        // final_input_reads.set{}
-
-        // def (merged_reads, other_reads) = final_input_reads.branch {
-        //     merged: it[0].merged
-        //     other: true
-        // }
-        // merged_reads_processed = merged_reads.map { meta, reads -> 
-        //     [meta + [single_end: true], reads]
-        // }
-        // ch_metaphlan_input = merged_reads_processed.mix(other_reads)
 
         ch_metaphlan_input = final_input_reads.map { meta, reads ->
             if (meta.merged) {
@@ -106,6 +82,8 @@ workflow PROFILING {
                 return [meta, reads]
             }
         }
+        
+        ch_metaphlan_input.count( "ch_metaphlan_input " ) 
 
         METAPHLAN_METAPHLAN ( 
             ch_metaphlan_input, 
@@ -121,9 +99,18 @@ workflow PROFILING {
 
 
         // Merge all MetaPhlAn profiles
-        // First re-map each sample id and its profile, then group all profiles by sample name and merge
+        // First filter out empty files
+        ch_valid_profiles = ch_raw_profiles.filter { tuple ->
+            def fileToCheck = tuple[1]
+            if( fileToCheck.size() == 0 ) {
+                log.warn "WARNING: Excluding empty metaphlan profile for: ${fileToCheck.getName()}"
+                return false
+            }
+            return true
+        }
+        // Then re-map each sample id and its profile, then group all profiles by sample name and merge
         METAPHLAN_MERGEMETAPHLANTABLES ( 
-            ch_raw_profiles.map{ [ [id:'all_samples'], it[1] ] }.groupTuple(sort: { it.getName() })
+            ch_valid_profiles.map{ [ [id:'all_samples'], it[1] ] }.groupTuple(sort: { it.getName() })
         )
         
         ch_versions        = ch_versions.mix( METAPHLAN_MERGEMETAPHLANTABLES.out.versions.first() )
@@ -131,8 +118,8 @@ workflow PROFILING {
 
     emit:
     ch_sam_files = METAPHLAN_METAPHLAN.out.sam
-    ch_raw_profiles
-    ch_profiles = METAPHLAN_MERGEMETAPHLANTABLES.out.txt       // ERROR ~ Cannot emit a multi-channel output: ch_profiles
+    ch_raw_profiles         //OR ch_valid_profiles
+    ch_profiles = METAPHLAN_MERGEMETAPHLANTABLES.out.txt  
     ch_final_dbs
     versions = ch_versions
 
@@ -159,35 +146,25 @@ workflow STRAIN_CHARACTERISATION {
 
     take:
     ch_sam_files 
-    ch_final_dbs    // ${params.strainphlan_db}   
-    clades_list     // TBD
-    ch_profiles     // Added
+    ch_final_dbs   
+    clades_list  
+    ch_profiles  
     ch_multiqc_files
     ch_versions
 
 
     main:
 
-    // strainphlan_db = ch_final_dbs    // mapped and aliased ch_final_dbs to strainphlan_db
-
-    // Convert the database path to a proper channel
-    // strainphlan_db = Channel.fromPath( "${params.outdir}/metaphlan_db_*/*.pkl", type: 'file' )
-    //     .ifEmpty { "No database found at: ${params.outdir}/metaphlan_db_*/" }
-    //     .map { dir -> 
-    //         def pkl_path = "${dir}*.pkl"
-    //         println "Using database from: ${pkl_path} for srainphlan"
-    //         return pkl_path
-    //     } // Using database from: /metaphlanstrainphlanTEST/metaphlan_db_latest/*.pkl
-
     if (!params.reference_genomes){
         //downloaded_genomes = Channel.empty() 
         
-        //TO BE EDITED BELOW & USE?
+        //TO BE EDITED/ DELETED
         // DOWNLOAD_GENOMES ( clades_list.flatten() )
         // DOWNLOAD_GENOMES.out.downloads_list.view{ "downloaded genomes list ${it}" }
 
         // download_genomes = DOWNLOAD_GENOMES.out.downloaded_genomes_success
         // reference_genomes = download_genomes
+        all_references = Channel.empty()
 
     } else {
         Channel
@@ -222,8 +199,6 @@ workflow STRAIN_CHARACTERISATION {
                 [meta, genome_path]        
             }.set { all_references }
 
-        // all_references.view { "all_references: $it" }
-
     }
 
     if ( params.run_strainphlan && !params.skip_strainphlan_prep ) {
@@ -238,19 +213,13 @@ workflow STRAIN_CHARACTERISATION {
             clade = clades_list.splitText().toList()
         } else {
             clade = Channel.empty() // Default to an empty channel
-        }
-        // AKA
-        // clade = params.strainphlan_clades 
-        //     ? Channel.of("${params.strainphlan_clades}".split(",").toList().flatten() )
-        //     : clades_list 
-        //         ? clades_list.splitText().toList()
-        //         : Channel.empty()       
+        }     
 
-        // clade.view{ "all clades from list: $it" }
+        clade.view{ "all clades from list: $it" }
 
         STRAINPHLAN_PREP_CONSENSUS (
-            ch_sam_files,           //     METAPHLAN_METAPHLAN.out.sam,
-            ch_final_dbs.first()            //  strainphlan_db, 
+            ch_sam_files,  
+            ch_final_dbs.first() 
         )
 
         STRAINPHLAN_PREP_CLADES (
@@ -263,30 +232,7 @@ workflow STRAIN_CHARACTERISATION {
             .set { ch_clade_markers }
 
         // Debug
-        ch_clade_markers.view { " ch_clade_markers: $it "}  // [t__SGB4936, /workdir/68/6905dbe8e85007019549cf74e17572/clade_markers/t__SGB4936.fna]
-
-            // ch_clade_markers.map { clade, fna_file ->
-            //     println "Clade: ${clade}, File: ${fna_file}" 
-            // }
-            //ch_clade = ch_clade_markers.map { clade, fna_file -> clade }    //.view { "ch_clade: $it" }        
-            //ch_marker_file = ch_clade_markers.map { clade, fna_file -> fna_file }   //.view { "ch_marker_file: $it" } 
-            
-            // ch_combined_references = ch_clade_markers
-            //     .map { clade, fna_file ->
-            //         // Read genome_list.csv and find matching references for the clade
-            //         def matched_rows = params.reference_genomes.findAll { row -> row.associated_clade == clade }
-            //         if (matched_rows.isEmpty()) {
-            //             error "No matching reference genome found for clade ${clade} in ${params.reference_genomes}"
-            //         }
-            //         // Collect reference genome paths
-            //         def genome_paths = matched_rows.collect { row -> row.ref_genome_path }
-            //         [clade, genome_paths, fna_file]
-            //     }
-            //     .view { "Clade: $it[0], Reference Genomes: $it[1], Marker File: $it[2]" }
-
-        
-        // all_references.view { " all_references: $it " }   // [[species_name:Roseburia hominis, strain_id:GCF_902387955.1, associated_clade:t__SGB4936], gs://bucket_name/././Roseburia hominis_ncbi_dataset/data/GCF_902387955.1/GCF_902387955.1_UHGG_MGYG-HGUT-02517_genomic.fna]
-        
+        ch_clade_markers.view { " ch_clade_markers: $it "} 
         
         // Modify the clade matching process
         ch_combined_references = ch_clade_markers
@@ -294,86 +240,30 @@ workflow STRAIN_CHARACTERISATION {
             .filter { clade, fna_marker_file, meta, genome_path -> 
                 boolean matched = meta.associated_clade == clade 
                 if (!matched) {
-                    println "No match for Clade ${clade}. Meta clade: ${meta.associated_clade}"
+                    log.debug "Filtering - No match for Clade ${clade} with Meta clade: ${meta.associated_clade}"   //warn
                 }
                 matched
             }
             .map { clade, fna_marker_file, meta, genome_path ->
                 def species_clean = meta.species_name.replace(' ', '_')         // Replace special characters in species name
                 [
-                // tuple(      
                     clade,
                     genome_path,
                     fna_marker_file,
                     species_clean,
                     meta.strain_id 
-                // )
                 ]
+                // log.debug "Processing - Clade: ${clade}, Meta clade: ${meta.associated_clade}"
             }
-            // ch_combined_references.view { tuple -> 
-            //     "Clade-Reference Combination: Tuple: ${tuple}" 
-            // } 
-            // Clade-Reference Combining: Tuple: [t__SGB4936, gs://mhra-ngs-dev-ut8t-training/231114-371_517-merged-fastq_ehillman/genome_downloads_complete/Roseburia hominis_ncbi_dataset/data/GCF_000225345.1/GCF_000225345.1_ASM22534v1_genomic.fna, /workdir/68/6905dbe8e85007019549cf74e17572/clade_markers/t__SGB4936.fna, Roseburia_hominis, GCF_000225345.1]
-            // Clade-Reference Combining: Tuple: [t__SGB4936, gs://mhra-ngs-dev-ut8t-training/231114-371_517-merged-fastq_ehillman/genome_downloads_complete/Roseburia hominis_ncbi_dataset/data/GCF_028743455.1/GCF_028743455.1_ASM2874345v1_genomic.fna, /workdir/68/6905dbe8e85007019549cf74e17572/clade_markers/t__SGB4936.fna, Roseburia_hominis, GCF_028743455.1]
-            // Clade-Reference Combining: Tuple: [t__SGB4936, gs://mhra-ngs-dev-ut8t-training/231114-371_517-merged-fastq_ehillman/genome_downloads_complete/Roseburia hominis_ncbi_dataset/data/GCF_902387955.1/GCF_902387955.1_UHGG_MGYG-HGUT-02517_genomic.fna, /workdir/68/6905dbe8e85007019549cf74e17572/clade_markers/t__SGB4936.fna, Roseburia_hominis, GCF_902387955.1]
-
-            // OR
-            // ch_combined_references.view { clade, genome, marker_file, species, strain_id -> 
-            //     "Clade-Reference Matching: \n  Clade: ${clade}   \n  Species: ${species}    \n Genome: ${genome} \n  Marker: ${marker_file}" 
-            // }
-
-
-
-            // ch_combined_references2 = ch_combined_references
-            //     .map { it -> tuple(it[0], it[1], it[2], it[3], it[4]) }
-            //     .toList()
-            //     .view { "ch_combined_references2222 $it" } // Ensures each tuple is separate
-
-
-
-                                // ch_clade_markers
-                                    // .map { clade, fna_file ->
-                                    // def clade_compare = clade.toString()
-                                    // all_references
-                                    //     .filter { meta, genome_path -> 
-                                    //         println "  2 Comparing: ${meta.associated_clade} vs ${clade_compare}" //Comparing: t__SGB4936 vs DataflowBroadcast around DataflowStream[?]
-                                    //         meta.associated_clade == clade_compare
-                                    //     }
-                                    //     .map { meta, genome_path -> 
-                                            // [clade_compare, genome_path, file(fna_file)] // Create the tuple
-                                    //     }
-                                    // }
-                                    // .set { ch_combined_references }
-
-                                        // ch_combined_references.view { "ch_combined_references $it" }
-
-                                // Modify the clade matching process
-                                // ch_combined_references = ch_clade_markers
-                                //     .map { clade, fna_file ->
-                                //         // Read reference genomes and find matching references for the clade
-                                //         def matched_references = all_references
-                                //             .filter { meta, genome_path -> 
-                                //                 println "Comparing: ${meta.associated_clade} vs ${clade}"
-                                //                 meta.associated_clade == clade }     // filter meta and genome paths, ensure 'associated_clade' has the variable 'clade'
-                                //             .map { meta, genome_path -> genome_path }
-                                //             .toList()
-                                //             .get()
-
-                                //         if (matched_references.isEmpty()) {
-                                //             error "No matching reference genome found for clade ${clade} in ${params.reference_genomes}"
-                                //         }
-
-                                //         [clade, matched_references, file(fna_file)]
-                                //     }.view { "Clade: $it[0], Reference Genomes: $it[1], Marker File: $it[2]" }
-
-
 
         if ( params.strainphlan_db ) {
-            strainphlan_db = Channel.fromPath(params.strainphlan_db)
+            strainphlan_db = Channel.value(params.strainphlan_db)
+            
+            strainphlan_db.view{ "strainphlan_db is at $it " }
+
         } else {
 
             strainphlan_db = ch_final_dbs
-                    // .ifEmpty { error "No database found at: ${params.outdir}/metaphlan_db_*/" }          // causes error at the start of pipeline
                 .map { dir -> 
                     def pkl_path = file(dir).listFiles().findAll { it.name.endsWith('.pkl') }
                     println "Found database .pkl file at: ${pkl_path} for StrainPhlAn"          // 
@@ -382,7 +272,9 @@ workflow STRAIN_CHARACTERISATION {
                     }
                     return pkl_path
                 }
-                .flatten() 
+                .flatten()
+            
+            strainphlan_db.view{ "strainphlan_db is at $it "}
         }
         // strainphlan_db.view {"strainphlan_db: $it "}
 
@@ -392,36 +284,25 @@ workflow STRAIN_CHARACTERISATION {
             ch_combined_references 
         )
         
-
-        // // works-ish
-        // STRAINPHLAN_STRAINPHLAN (
-        //     STRAINPHLAN_PREP_CONSENSUS.out.consensus_markers,
-        //     strainphlan_db, //ch_final_dbs, 
-        //     all_references,
-        //     ch_profiles,
-        //     ch_clade,
-        //     ch_marker_file
-            
-        //     // []
-        //     // STRAINPHLAN_PREP_CLADES.out.clade_markers
-        //     // clade
-        // )
-        // STRAINPHLAN_STRAINPHLAN.out.tre_file.view { ".tre files $it" }
-
-
         if ( params.metadata ) {
+            
             ch_metadata = Channel.fromPath("${params.metadata}", checkIfExists: true)
                 .ifEmpty { error "No metadata file has been found at: ${params.metadata}." }
 
             STRAINPHLAN_METADATA(
                 STRAINPHLAN_STRAINPHLAN.out.tre_file,
-                ch_metadata
+                ch_metadata.first()
             )
+            // if ( params.graphlan_plots ) {
+            //     GRAPHPHLAN_PLOTTING(
+            //         STRAINPHLAN_METADATA.out
+            //     )
+            // }
         }
 
     } else if ( params.skip_strainphlan_prep ) {
         Channel
-            .fromPath("${params.consensus_markers}/*")   // !! OR "${params.outdir}/**/*.pkl"
+            .fromPath("${params.consensus_markers}/*") 
             .ifEmpty { error "No consensus marker files (.pkl or .json.bz2) found at ${params.outdir}/strainphlan/consensus_markers/" }
             .set { ch_consensus_markers }
 
@@ -463,7 +344,6 @@ workflow STRAIN_CHARACTERISATION {
             ch_consensus_markers.collect(),
             ch_combined_references
         )
-        // STRAINPHLAN_STRAINPHLAN.out.tre_file.view { ".tre files $it" }
 
         STRAINPHLAN_METADATA(
             STRAINPHLAN_STRAINPHLAN.out.tre_file.toList().flatten(),

@@ -20,64 +20,65 @@
 
 **nf-core/metaphlan2strainphlan** is a bioinformatics pipeline that ...
 
-<!-- TODO nf-core:
-   Complete this sentence with a 2-3 sentence summary of what types of data the pipeline ingests, a brief overview of the
-   major pipeline sections and the types of output it produces. You're giving an overview to someone new
-   to nf-core here, in 15-20 seconds. For an example, see https://github.com/nf-core/rnaseq/blob/master/README.md#introduction
--->
 
-<!-- TODO nf-core: Include a figure that guides the user through the major workflow steps. Many nf-core
-     workflows use the "tube map" design for that. See https://nf-co.re/docs/contributing/design_guidelines#examples for examples.   -->
-<!-- TODO nf-core: Fill in short bullet-pointed list of the default steps in the pipeline -->
+This pipeline runs both MetaPhlAn 4.1 and StrainPhlAn 4.0 from the biobakery collection to analyse metagenomic shotgun sequencing data. The former allows users to profile the composition of microbial communities while the latter characterises sample sets to a strain-level resolution of the species of interest.
 
-1. Read QC ([`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
-2. Present QC for raw reads ([`MultiQC`](http://multiqc.info/))
-3. Preprocess [`fastQC|fastp|bbduk|bbmerge`]
-4. Download database and run profiling steps with MetaPhlAn4.1
-5. Characterise strains using StrainPhlAn
+Please refer to the tools' Github repository:
+- https://github.com/biobakery/biobakery/wiki/MetaPhlAn-4.1
+- https://github.com/biobakery/biobakery/wiki/strainphlan4
 
-## Usage
+
+<!-- TODO nf-core: Include a figure that guides the user through the major workflow steps. Many nf-core workflows use the "tube map" design for that. See https://nf-co.re/docs/contributing/design_guidelines#examples for examples.   -->
+
+## Default steps
+1. Pre QC ([`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
+2. Optional pre-processing of FASTQ using ([`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) | [`fastp`](https://github.com/OpenGene/fastp) | [`BBDuk`](https://archive.jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbduk-guide/)) which includes:
+    - trimming and quality filtering 
+    - adapter or contamination removal
+    - merging any paired reads 
+3. Post QC ([`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
+4. Download database and perform taxonomic classification and profiling with ([`MetaPhlAn4.1`](https://github.com/biobakery/biobakery/wiki/MetaPhlAn-4.1))
+5. Merge MetaPhlAn results and standardise into an output table (`METAPHLAN_MERGEMETAPHLANTABLES`)
+6. Generate abundance tables of species
+7. Present QC for raw reads ([`MultiQC`](http://multiqc.info/))
+
+Additional steps:
+8. Characterise strains using ([`StrainPhlAn4`](https://github.com/biobakery/biobakery/wiki/strainphlan4))
+ 
+
+## Using Nextflow
 
 > [!NOTE]
 > If you are new to Nextflow and nf-core, please refer to [this page](https://nf-co.re/docs/usage/installation) on how to set-up Nextflow. Make sure to [test your setup](https://nf-co.re/docs/usage/introduction#how-to-run-a-pipeline) with `-profile test` before running the workflow on actual data.
 
-<!-- TODO nf-core: Describe the minimum required steps to execute the pipeline, e.g. how to prepare samplesheets.
-     Explain what rows and columns represent. For instance (please edit as appropriate):
+Before running the pipeline, please refer to the [usage documentation](docs/usage.md) for more details and further functionality.
 
-First, prepare a samplesheet with your input data that looks as follows:
-
-`samplesheet.csv`:
-
-```csv
-sample,fastq_1,fastq_2
-CONTROL_REP1,AEG588A1_S1_L002_R1_001.fastq.gz,AEG588A1_S1_L002_R2_001.fastq.gz
-```
-
-Each row represents a fastq file (single-end) or a pair of fastq files (paired end).
-
--->
-
-Now, you can run the pipeline using:
-
-<!-- TODO nf-core: update the following command to include all required parameters for a minimal example -->
+Now, run using:
 
 ```bash
 nextflow run nf-core-metaphlanstrainphlan \
-	-profile <docker/singularity/.../institute> \
+	-profile docker,gcb \
   --samplesheet samplesheet.csv \
-	--installdb \
-	--metaphlan_index mpa_vJun23_CHOCOPhlAnSGB_202403 \
+	--installdb --metaphlan_index mpa_vJun23_CHOCOPhlAnSGB_202403 \
 	--run_metaphlan --run_strainphlan \
 	--bbmerge_pairs \
 	--qc_tool 'bbduk,fastqc' \
-  --outdir <OUTDIR>
+  --outdir './results'
 ```
+
+
+This pipeline can be launched with different profiles such as `docker` and `gcb` configurations. 
+
+> [!WARNING]
+> **NOTE: the `gcb` profile in the nextflow.config will need to be amended to match user's own google credentials. E.g. `bucket_name` and `project_id` in the file should be filled in.**
+
+See below for more information about profiles.
+
 
 > [!WARNING]
 > Please provide pipeline parameters via the CLI or Nextflow `-params-file` option. Custom config files including those provided by the `-c` Nextflow option can be used to provide any configuration _**except for parameters**_;
 > see [docs](https://nf-co.re/usage/configuration#custom-configuration-files).
-
-For more details and further functionality, please refer to the [usage documentation](https://nf-co.re/metaphlan2strainphlan/usage) and the [parameter documentation](https://nf-co.re/metaphlan2strainphlan/parameters).
+<br>
 
 ## Pipeline output
 
@@ -87,11 +88,7 @@ For more details about the output files and reports, please refer to the
 
 ## Credits
 
-nf-core/metaphlan2strainphlan was originally written by IDS.
-
-We thank the following people for their extensive assistance in the development of this pipeline:
-
-<!-- TODO nf-core: If applicable, make list of people who have also contributed -->
+nf-core/metaphlanstrainphlan was originally written by Dammy Shittu.
 
 
 ## Citations
@@ -103,7 +100,7 @@ We thank the following people for their extensive assistance in the development 
 
 An extensive list of references for the tools used by the pipeline can be found in the [`CITATIONS.md`](CITATIONS.md) file.
 
-You can cite the `nf-core` publication as follows:
+You can cite the nf-core publication as follows:
 
 > **The nf-core framework for community-curated bioinformatics pipelines.**
 >
